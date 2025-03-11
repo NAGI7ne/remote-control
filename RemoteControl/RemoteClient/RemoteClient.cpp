@@ -11,7 +11,7 @@
 #define new DEBUG_NEW
 #endif
 
-
+  
 // CRemoteClientApp 
 
 BEGIN_MESSAGE_MAP(CRemoteClientApp, CWinApp)
