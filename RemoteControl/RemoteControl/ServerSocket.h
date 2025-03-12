@@ -5,12 +5,12 @@
 class CPacket {
 public:
 	CPacket() : sHead(0), nLength(0), sCmd(0), sSum(0){}
-	CPacket(const CPacket& ss) {
-		sHead = ss.sHead;
-		nLength = ss.nLength;
-		sCmd = ss.sCmd;
-		strData = ss.strData;
-		sSum = ss.sSum;
+	CPacket(const CPacket& pack) {
+		sHead = pack.sHead;
+		nLength = pack.nLength;
+		sCmd = pack.sCmd;
+		strData = pack.strData;
+		sSum = pack.sSum;
 	}
 	CPacket(const BYTE* pData, size_t& nSize) {
 		size_t i = 0;
@@ -50,13 +50,13 @@ public:
 		nSize = 0;
 		return;
 	}
-	CPacket& operator=(const CPacket& ss) {
-		if (this != &ss) {
-			sHead = ss.sHead;
-			nLength = ss.nLength;
-			sCmd = ss.sCmd;
-			strData = ss.strData;
-			sSum = ss.sSum;
+	CPacket& operator=(const CPacket& pack) {
+		if (this != &pack) {
+			sHead = pack.sHead;
+			nLength = pack.nLength;
+			sCmd = pack.sCmd;
+			strData = pack.strData;
+			sSum = pack.sSum;
 		}
 		return *this;
 	}
