@@ -2,6 +2,8 @@
 #include "pch.h"
 #include "framework.h"
 
+#pragma pack(push)   //TODO:什么意思
+#pragma pack(1)
 class CPacket {
 public:
 	CPacket() : sHead(0), nLength(0), sCmd(0), sSum(0){}
@@ -12,7 +14,18 @@ public:
 		strData = pack.strData;
 		sSum = pack.sSum;
 	}
-	CPacket(const BYTE* pData, size_t& nSize) {
+	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {
+		sHead = 0xFEFF;
+		nLength = nSize + 2 + 2;
+		sCmd = nCmd;
+		strData.resize(nSize);
+		memcpy((void*)strData.c_str(), pData, nSize);    //TODO:这里为什么可以直接用byte*
+		sSum = 0;
+		for (size_t j = 0; j < nSize; j++) {
+			sSum += pData[j] & 0xFF;
+		}
+	}
+	CPacket(const BYTE* pData, size_t& nSize) {    //解包
 		size_t i = 0;
 		for (i; i < nSize; i++) {
 			if (*(WORD*)(pData + i) == 0xFEFF) {   //包头存在 
@@ -41,7 +54,7 @@ public:
 		sSum = *(WORD*)(pData + i); i += 2;
 		WORD sum = 0;
 		for (size_t j = 0; j < strData.size(); j++) {
-			sum += BYTE(strData[i]) & 0xFF;  //转为字节
+			sum += BYTE(strData[j]) & 0xFF;  //转为字节
 		}
 		if (sum == sSum) {
 			nSize = i;
@@ -60,16 +73,30 @@ public:
 		}
 		return *this;
 	}
+	size_t Size() {
+		return nLength + 6;
+	}
+	const char* Data(){    //返回完整数据
+		strOut.resize(nLength + 6);
+		BYTE* pData = (BYTE*)strOut.c_str();
+		*(WORD*)pData = sHead; pData += 2;
+		*(DWORD*)pData = nLength; pData += 4;
+		*(WORD*)pData = sCmd; pData += 2;
+		memcpy(pData, strData.c_str(), strData.size()); pData += strData.size();
+		*(WORD*)pData = sSum; 
+		return strOut.c_str();
+	}
 	~CPacket(){}
 public:
 	WORD sHead; //包头 0xFEFF
 	DWORD nLength; //包长度 （控制命令到和校验）
 	WORD sCmd;  //控制命令
 	std::string strData;   //包数据 
-	WORD sSum; //和校验
-private:
-
+	WORD sSum; //和校验(校验包数据的和)
+	std::string strOut; //整个包的数据
 };
+#pragma pack(pop)
+
 //采用单例设计模式
 class CServerSocket    
 {
@@ -121,6 +148,10 @@ public:
 	bool Send(const char* pData, int nSize) {
 		if (mClntSock == -1) return false;
 		return send(mClntSock, pData, nSize, 0) > 0;
+	}
+	bool Send(const CPacket& pack) {
+		if (mClntSock == -1) return false;
+		return send(mClntSock, (const char*)&pack, pack.nLength + 2 + 4, 0) > 0;   //TODO:这里为什么可以const CPacket&强转const char*
 	}
 private:
 	SOCKET mSock, mClntSock;
