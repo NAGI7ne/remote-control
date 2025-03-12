@@ -34,14 +34,15 @@ int main()
         }
         else
         {
-            // TODO: 在此处为应用程序的行为编写代码。
-            CServerSocket* pserver = CServerSocket::getInstance();  //TODO：这里有问题
+            //实例在main前已被初始化，这里申请一个指针来操作这个实例
+            CServerSocket* pserver = CServerSocket::getInstance();  
             int cnt = 0;
             if (!pserver->InitSocket()) {
                 MessageBox(NULL, _T("网络初始化异常，请检查网络设置"), _T("网络初始化失败!"), MB_OK | MB_ICONERROR);
                 exit(0);
             }
-            while (CServerSocket::getInstance() != NULL) {    //TODO：这里有问题
+            //CServerSocket::getInstance() 返回实例的指针
+            while (CServerSocket::getInstance() != NULL) {  
                 if (!pserver->AcceptClient()) {
                     if (cnt >= 3) {
                         MessageBox(NULL, _T("超时!"), _T("网络初始化失败!"), MB_OK | MB_ICONERROR);
