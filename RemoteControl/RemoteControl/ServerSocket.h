@@ -2,7 +2,7 @@
 #include "pch.h"
 #include "framework.h"
 
-#pragma pack(push)   //TODO:什么意思
+#pragma pack(push) 
 #pragma pack(1)
 class CPacket {
 public:
@@ -19,7 +19,7 @@ public:
 		nLength = nSize + 2 + 2;
 		sCmd = nCmd;
 		strData.resize(nSize);
-		memcpy((void*)strData.c_str(), pData, nSize);    //TODO:这里为什么可以直接用byte*
+		memcpy((void*)strData.c_str(), pData, nSize); 
 		sSum = 0;
 		for (size_t j = 0; j < nSize; j++) {
 			sSum += pData[j] & 0xFF;
@@ -73,7 +73,7 @@ public:
 		}
 		return *this;
 	}
-	size_t Size() {
+	size_t Size() const{
 		return nLength + 6;
 	}
 	const char* Data(){    //返回完整数据
@@ -151,7 +151,14 @@ public:
 	}
 	bool Send(const CPacket& pack) {
 		if (mClntSock == -1) return false;
-		return send(mClntSock, (const char*)&pack, pack.nLength + 2 + 4, 0) > 0;   //TODO:这里为什么可以const CPacket&强转const char*
+		return send(mClntSock, (const char*)&pack, pack.nLength + 2 + 4, 0) > 0; 
+	}
+	bool GetFilePath(std::string &strPath)const {
+		if (mPacket.sCmd == 2) {
+			strPath = mPacket.strData;
+			return true;
+		}
+		return false;
 	}
 private:
 	SOCKET mSock, mClntSock;
@@ -191,7 +198,6 @@ private:
 		}
 	}
 	//在main开始前初始化实例
-
 	static CServerSocket* mInstance;
 	//防止类没有被析构，原因mInstance没有delete，加一个类来间接删除mInstance
 	//CHelper 的析构函数充当了一个监控者，它在对象销毁时主动清理单例
