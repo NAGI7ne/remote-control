@@ -14,12 +14,17 @@ public:
 		strData = pack.strData;
 		sSum = pack.sSum;
 	}
-	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {
+	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {  //·â×°°ü
 		sHead = 0xFEFF;
 		nLength = nSize + 2 + 2;
 		sCmd = nCmd;
-		strData.resize(nSize);
-		memcpy((void*)strData.c_str(), pData, nSize); 
+		if (nSize > 0) {
+			strData.resize(nSize);
+			memcpy((void*)strData.c_str(), pData, nSize);
+		}
+		else {
+			strData.clear();
+		}
 		sSum = 0;
 		for (size_t j = 0; j < nSize; j++) {
 			sSum += pData[j] & 0xFF;
@@ -154,7 +159,7 @@ public:
 		return send(mClntSock, (const char*)&pack, pack.nLength + 2 + 4, 0) > 0; 
 	}
 	bool GetFilePath(std::string &strPath)const {
-		if (mPacket.sCmd == 2) {
+		if (mPacket.sCmd >= 2 && mPacket.sCmd <= 4) {
 			strPath = mPacket.strData;
 			return true;
 		}
