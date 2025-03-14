@@ -265,6 +265,60 @@ int SendScreen() {
     return 0;
 }
 
+#include "LockInfoDialog.h"
+CLockInfoDialog dlg;  //需要多次调用，用全局变量
+unsigned threadid = 0;
+
+unsigned threadLockDlg(void* arg) {
+    TRACE("%s (%d) : %d\r\n", __FUNCTION__, __LINE__, GetCurrentThreadId());
+    CRect rect;
+    /*rect.left = 0;
+    rect.top = 0;
+    rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
+    rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);*/  //获取整个屏幕
+    dlg.Create(IDD_DIALOG1_INFO, NULL);
+    dlg.ShowWindow(SW_SHOW);
+    dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);  //窗口置顶，设置不能移动，不能改变大小
+    //ShowCursor(false);   //取消鼠标显示
+    ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);  //隐藏任务栏
+    dlg.GetWindowRect(rect);   //获取窗口
+    //ClipCursor(rect);   //将鼠标限制在窗口
+    rect.right = rect.left + 1;
+    rect.bottom = rect.top + 1;
+    ClipCursor(rect);   //将鼠标限制在一个像素点
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+        if (msg.message == WM_KEYDOWN) {
+            TRACE("msg:%08X wparam:%08x lparam:%08x\r\n", msg.message, msg.wParam, msg.lParam);  //TODO:什么意思
+            if (msg.wParam == 0x1B)  break;  //按ESC退出
+        }
+    }
+    ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);  //显示任务栏
+    //ShowCursor(true);
+    dlg.DestroyWindow();
+    _endthreadex(0);
+    return 0;
+}
+
+int LockMachine() {
+    //锁机放入线程运行
+    if((dlg.m_hWnd == NULL) || (dlg.m_hWnd == INVALID_HANDLE_VALUE) )
+        _beginthreadex(NULL, 0, threadLockDlg, NULL, 0, &threadid), 
+        TRACE("thread = %d\r\n", threadid);
+    CPacket pack(7, NULL, 0);
+    CServerSocket::getInstance()->Send(pack);
+    return 0;
+}
+
+int UnlockMachine() {
+    PostThreadMessage(threadid, WM_KEYDOWN, 0x1B, 0);
+    CPacket pack(8, NULL, 0);
+    CServerSocket::getInstance()->Send(pack);
+    return 0;
+}
+
 int main()
 {
     int nRetCode = 0;
@@ -301,7 +355,8 @@ int main()
             //    }
             //    int ret = pserver->DealCommand();
             //}
-            int nCmd = 6;
+            
+            int nCmd = 7;
             switch (nCmd) {
             case 1:  //查看磁盘分区
                 MakeDriverInfo();
@@ -321,7 +376,17 @@ int main()
             case 6:  //发送屏幕内容(截图)
                 SendScreen();
                 break;
+            case 7:  //锁机
+                LockMachine();
+                break;
+            case 8:  //解锁
+                UnlockMachine();
+                break;
             }
+            Sleep(3000);
+            UnlockMachine();
+            while ((dlg.m_hWnd != NULL) && (dlg.m_hWnd != INVALID_HANDLE_VALUE)) Sleep(1000);
+            TRACE("m_hWnd = %08X\r\n", dlg.m_hWnd);
         }
     }
     else
