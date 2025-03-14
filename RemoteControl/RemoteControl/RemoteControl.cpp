@@ -288,8 +288,8 @@ unsigned threadLockDlg(void* arg) {
     ClipCursor(rect);   //将鼠标限制在一个像素点
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
-        TranslateMessage(&msg);
-        DispatchMessage(&msg);
+        TranslateMessage(&msg);  //虚拟键码消息转换为字符消息
+        DispatchMessage(&msg);  //消息分发给窗口过程进行处理
         if (msg.message == WM_KEYDOWN) {
             TRACE("msg:%08X wparam:%08x lparam:%08x\r\n", msg.message, msg.wParam, msg.lParam);  //TODO:什么意思
             if (msg.wParam == 0x1B)  break;  //按ESC退出
