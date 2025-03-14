@@ -145,7 +145,6 @@ public:
 		if (mSock == -1) return false;
 		sockaddr_in servAddr, clntAddr;
 		memset(&servAddr, 0, sizeof(servAddr));
-		// 服务器可能不止一个ip地址,所监听所有，确保客户端能连上
 		servAddr.sin_family = AF_INET;
 		servAddr.sin_port = htons(9339);
 		servAddr.sin_addr.s_addr = inet_addr(stringIPAddr.c_str());
