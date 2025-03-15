@@ -21,22 +21,13 @@ public:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 
 private:
-	int SendCommendPacket(int nCmd, BYTE* pData = NULL, size_t length = 0) {
-		UpdateData();
-		CClientSocket* pClient = CClientSocket::getInstance();
-		bool ret = pClient->InitSocket(mServAddr, atoi((LPCTSTR)mNport));
-		if (ret == NULL) {
-			AfxMessageBox(_T("网络初始化失败!"));
-			return -1;
-		}
-		CPacket pack(nCmd, pData, length);
-		int rst = pClient->Send(pack);
-		TRACE("send rst: %d\r\n", rst);
-		int cmd = pClient->DealCommand();
-		TRACE("ack: %d\r\n", cmd);
-		pClient->CloseSocket();
-		return cmd;
-	}
+	// 1查看磁盘分区  2查看指定目录文件
+	// 3打开文件      4下载文件
+	// 返回值：命令， -1错误
+	int SendCommendPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t length = 0);
+	CString GetPath(HTREEITEM hTree);
+	void DeleteTreeChildrenItem(HTREEITEM hTree);
+	void LoadFileInfo();
 // 实现
 protected:
 	HICON m_hIcon;
@@ -53,4 +44,9 @@ public:
 	CString mNport;
 	afx_msg void OnBnClickedBtnFileinfo();
 	CTreeCtrl mTree;
+	afx_msg void OnNMDblclkTree1Dir(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnNMClickTree1Dir(NMHDR* pNMHDR, LRESULT* pResult);
+	// 显示文件
+	CListCtrl mList;
+	afx_msg void OnNMRClickList1File(NMHDR* pNMHDR, LRESULT* pResult);
 };

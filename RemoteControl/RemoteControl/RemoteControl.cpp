@@ -49,18 +49,6 @@ int MakeDriverInfo() {
 #include <io.h>
 #include <stdio.h>
 #include <list>
-typedef struct fileInfo {
-    fileInfo(){
-        IsInvalid = FALSE;
-        IsDirectory = -1;
-        HasNext = TRUE;
-        memset(szFileName, 0, sizeof(szFileName));
-    }
-    BOOL IsInvalid; //是否无效
-    BOOL IsDirectory; //是否为目录 
-    BOOL HasNext; //是否还有后续
-    char szFileName[256];  //文件名
-}FILEINFO, *PFILEINFO;
 
 int MakeDirectoryInfo() {
     std::string strPath;
@@ -82,7 +70,7 @@ int MakeDirectoryInfo() {
         return -2;
     }
     _finddata_t fdata;
-    int hfind = 0;
+    intptr_t hfind = 0;
     if ((hfind = _findfirst("*", &fdata)) == -1) {
         OutputDebugString(_T("没有找到文件！"));
         return -3;
@@ -93,6 +81,8 @@ int MakeDirectoryInfo() {
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
         //lstFileInfos.push_back(finfo);
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+        //Dump((BYTE*)pack.Data(), pack.Size());
+        Sleep(5);  //确保数据能正常被服务器收到
         CServerSocket::getInstance()->Send(pack);
     } while (!_findnext(hfind, &fdata));
     FILEINFO finfo;
