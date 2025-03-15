@@ -52,6 +52,8 @@ END_MESSAGE_MAP()
 
 CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 	: CDialogEx(IDD_REMOTECLIENT_DIALOG, pParent)
+	, mServAddr(0)
+	, mNport(_T(""))
 {
 	m_hIcon = AfxGetApp()->LoadIcon(IDR_MAINFRAME);
 }
@@ -59,6 +61,9 @@ CRemoteClientDlg::CRemoteClientDlg(CWnd* pParent /*=nullptr*/)
 void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 {
 	CDialogEx::DoDataExchange(pDX);
+	DDX_IPAddress(pDX, IDC_IPADDRESS2_SERV, mServAddr);
+	DDX_Text(pDX, IDC_EDIT1_PORT, mNport);
+	DDX_Control(pDX, IDC_TREE1_DIR, mTree);
 }
 
 BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
@@ -66,6 +71,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_WM_PAINT()
 	ON_WM_QUERYDRAGICON()
 	ON_BN_CLICKED(IDC_BTN1_TEST, &CRemoteClientDlg::OnBnClickedBtn1Test)
+	ON_BN_CLICKED(IDC_BTN_FILEINFO, &CRemoteClientDlg::OnBnClickedBtnFileinfo)
 END_MESSAGE_MAP()
 
 
@@ -101,6 +107,12 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
 	// TODO: 在此添加额外的初始化代码
+	//从对话框上的控件（例如编辑框、复选框等）中提取当前的内容，并把这些数据写入关联的成员变量中。
+	UpdateData();  
+	mServAddr = 0x7F000001;
+	mNport = _T("9339");
+	//FALSE 时,UpdateData 则会把成员变量的值更新到对话框控件上（通常用于在对话框初始化时显示默认值）。
+	UpdateData(FALSE);
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -156,16 +168,33 @@ HCURSOR CRemoteClientDlg::OnQueryDragIcon()
 
 void CRemoteClientDlg::OnBnClickedBtn1Test()
 {
-	CClientSocket* pClient = CClientSocket::getInstance();
-	bool ret = pClient->InitSocket("127.0.0.1");
-	if (ret == NULL) {
-		AfxMessageBox(_T("网络初始化失败!"));
+	SendCommendPacket(39);
+
+}
+
+
+void CRemoteClientDlg::OnBnClickedBtnFileinfo()
+{
+	int ret = SendCommendPacket(1);
+	if (ret == -1) {
+		AfxMessageBox(_T("命令处理失败"));
 		return;
 	}
-	CPacket pack(39, NULL, 0);
-	int rst = pClient->Send(pack);
-	TRACE("send rst: %d\r\n", rst);
-	int cmd = pClient->DealCommand();
-	TRACE("ack: %d\r\n", cmd);
-	pClient->CloseSocket();
+	CClientSocket* pClient = CClientSocket::getInstance();
+	std::string drivers = pClient->GetPacket().strData;
+	std::string dr;
+	mTree.DeleteAllItems();
+	for (int i = 0; i < drivers.size(); i++) {
+		if (drivers[i] == ',') {
+			dr += ':';
+			mTree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);  //加入到根目录，追加形式
+			dr.clear();
+			continue;
+		}
+		dr += drivers[i];
+	} 
+	dr += ':';
+	mTree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);  //加入到根目录，追加形式
+	dr.clear();
+
 }

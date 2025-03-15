@@ -130,15 +130,16 @@ public:
 		if (!mInstance) mInstance = new CClientSocket;
 		return mInstance;
 	}
-	bool InitSocket(std::string stringIPAddr) {
+	bool InitSocket(int nIP, int nPort) {
 		if (mSock != INVALID_SOCKET) CloseSocket();
 		mSock = socket(PF_INET, SOCK_STREAM, 0);
 		if (mSock == -1) return false;
 		sockaddr_in servAddr;
 		memset(&servAddr, 0, sizeof(servAddr));
 		servAddr.sin_family = AF_INET;
-		servAddr.sin_port = htons(9339);
-		servAddr.sin_addr.s_addr = inet_addr(stringIPAddr.c_str());
+		TRACE("addr: %08x nIP: %08x\r\n", inet_addr("127.0.0.1"), nIP);
+		servAddr.sin_port = htons(nPort);
+		servAddr.sin_addr.s_addr = htonl(nIP);
 		if (servAddr.sin_addr.s_addr == INADDR_NONE) {
 			AfxMessageBox(_T("指定IP不存在!"));
 			return false;
