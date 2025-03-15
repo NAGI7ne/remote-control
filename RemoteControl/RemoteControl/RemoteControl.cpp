@@ -59,11 +59,7 @@ int MakeDirectoryInfo() {
     }
     if (_chdir(strPath.c_str()) != 0) {
         FILEINFO finfo;
-        finfo.IsDirectory = TRUE;
-        finfo.IsInvalid = TRUE;
         finfo.HasNext = FALSE;
-        memcpy(finfo.szFileName, strPath.c_str(), strPath.size());
-        //lstFileInfos.push_back(finfo);
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
         CServerSocket::getInstance()->Send(pack);
         OutputDebugString(_T("无法打开文件！请检查权限"));
@@ -73,18 +69,24 @@ int MakeDirectoryInfo() {
     intptr_t hfind = 0;
     if ((hfind = _findfirst("*", &fdata)) == -1) {
         OutputDebugString(_T("没有找到文件！"));
+        FILEINFO finfo;
+        finfo.HasNext = FALSE;
+        CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
+        CServerSocket::getInstance()->Send(pack);
         return -3;
     }
+    int count = 0;
     do {
         FILEINFO finfo;
         finfo.IsDirectory = (fdata.attrib & _A_SUBDIR) != 0;
         memcpy(finfo.szFileName, fdata.name, strlen(fdata.name));
-        //lstFileInfos.push_back(finfo);
+        TRACE("FileName :%s\r\n", finfo.szFileName);
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
         //Dump((BYTE*)pack.Data(), pack.Size());
         Sleep(5);  //确保数据能正常被服务器收到
         CServerSocket::getInstance()->Send(pack);
     } while (!_findnext(hfind, &fdata));
+    //TRACE("server: count = %d\r\n", count);
     FILEINFO finfo;
     finfo.HasNext = FALSE;
     CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
@@ -104,11 +106,12 @@ int RunFile() {
 int DownloadFile() {
     std::string strPath;
     CServerSocket::getInstance()->GetFilePath(strPath);
+    //TRACE("file: %s", strPath.c_str());
     long long data = 0;
     FILE* pFile = NULL;
     errno_t err = fopen_s(&pFile, strPath.c_str(), "rb");
     if (err != 0) {
-        CPacket pack(4, NULL, 0);
+        CPacket pack(4, (BYTE*)&data, 8);
         CServerSocket::getInstance()->Send(pack);
         return -1;
     }
@@ -123,6 +126,7 @@ int DownloadFile() {
         do {
             rlen = fread(buffer, 1, 1024, pFile);
             CPacket pack(4, (BYTE*)buffer, rlen);
+            //Sleep(5);
             CServerSocket::getInstance()->Send(pack);
         } while (rlen >= 1024);
         fclose(pFile);
@@ -167,6 +171,7 @@ int MouseEvent() {
         default:
             break;
         }
+        TRACE("mouse event : %08X x %d y %d\r\n", nFlags, mouse.ptXY.x, mouse.ptXY.y);
         switch (nFlags) {
         case 0x21:  //左键双击
             mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, GetMessageExtraInfo());

@@ -49,4 +49,7 @@ public:
 	// 显示文件
 	CListCtrl mList;
 	afx_msg void OnNMRClickList1File(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnDownloadFile();
+	afx_msg void OnDeleteFile();
+	afx_msg void OnRunFile();
 };

@@ -139,7 +139,7 @@ public:
 		return mInstance;
 	}
 	bool InitSocket() {
-		mSock = socket(PF_INET, SOCK_STREAM, 0);
+		//mSock = socket(PF_INET, SOCK_STREAM, 0);
 		if (mSock == -1) return false;
 		sockaddr_in servAddr;
 		memset(&servAddr, 0, sizeof(servAddr));
@@ -162,7 +162,7 @@ public:
 	}
 #define BUFFER_SIZE 4096
 	int DealCommand() {
-		if (mClntSock == -1) return false;
+		if (mClntSock == -1) return -1;
 		char* buffer = new char[BUFFER_SIZE];
 		if (buffer == NULL) {
 			TRACE("ÄÚ´æ²»×ã! \r\n");

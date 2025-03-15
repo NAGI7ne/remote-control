@@ -132,7 +132,7 @@ typedef struct MouseEvent {
 }MOUSEEV, * PMOUSEEV;
 
 std::string GetErrorInfo(int wsaErrCode);
-
+void Dump(BYTE* pData, size_t nSize);
 //采用单例设计模式
 class CClientSocket
 {
@@ -140,7 +140,7 @@ public:
 	//确保外部能够访问
 	//静态函数没有this指针，无法直接访问成员变量
 	static CClientSocket* getInstance() {
-		if (!mInstance) mInstance = new CClientSocket;
+		if (!mInstance) mInstance = new CClientSocket();
 		return mInstance;
 	}
 	bool InitSocket(int nIP, int nPort) {
@@ -169,16 +169,16 @@ public:
 	int DealCommand() {
 		if (mSock == -1) return false;
 		char* buffer = mBuffer.data();
-		memset(buffer, 0, BUFFER_SIZE);
+		//memset(buffer, 0, BUFFER_SIZE);
 		size_t index = 0;
 		while (1) {
 			size_t len = recv(mSock, buffer + index, BUFFER_SIZE - index, 0);
-			if (len <= 0) return -1;
-			TRACE("client rev : %d\r\n", len);
+			if (len <= 0 && (index <= 0)) return -1;
+			//TRACE("client rev : %d\r\n", len);
 			index += len;
 			len = index;
 			mPacket = CPacket((BYTE*)buffer, len);
-			TRACE("客户端解包成功 cmd: %d\r\n", mPacket.sCmd);
+			//TRACE("客户端解包成功 cmd: %d\r\n", mPacket.sCmd);
 			if (len > 0) {
 				memcpy(buffer, buffer + len, BUFFER_SIZE - len);
 				index -= len;
@@ -232,6 +232,7 @@ private:
 			exit(0);
 		}
 		mBuffer.resize(BUFFER_SIZE);
+		memset(mBuffer.data(), 0, BUFFER_SIZE);
 	}
 	~CClientSocket() {
 		closesocket(mSock);
@@ -246,7 +247,7 @@ private:
 	}
 	//这里mInstance是静态变量，release需要操作这个变量所以是静态的函数
 	static void releaseInstance() {
-		if (mInstance) {
+		if (mInstance != NULL) {
 			CClientSocket* tmp = mInstance;
 			mInstance = NULL;
 			//delete时调用CClientSocket的析构函数

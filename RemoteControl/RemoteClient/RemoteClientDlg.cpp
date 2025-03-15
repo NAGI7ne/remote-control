@@ -77,6 +77,7 @@ int CRemoteClientDlg::SendCommendPacket(int nCmd, bool bAutoClose, BYTE* pData, 
 		return -1;
 	}
 	CPacket pack(nCmd, pData, length);
+	//TRACE("send file: %s\r\n", (const char*)pData);
 	int rst = pClient->Send(pack);
 	TRACE("send rst: %d\r\n", rst);
 	int cmd = pClient->DealCommand();  //发送包后进入收包状态
@@ -90,7 +91,7 @@ CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 	CString strRet, strTmp;
 	do {
 		strTmp = mTree.GetItemText(hTree);
-		strRet = strTmp + "//" + strRet;
+		strRet = strTmp + '\\' + strRet;
 		hTree = mTree.GetParentItem(hTree);
 	} while (hTree != NULL);
 	return strRet;
@@ -120,7 +121,7 @@ void CRemoteClientDlg::LoadFileInfo()
 	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	CClientSocket* pClient = CClientSocket::getInstance();
 	while (pInfo->HasNext) {
-		TRACE("file[%s] Isdir : %d", pInfo->szFileName, pInfo->IsDirectory);
+		TRACE("file[%s] Isdir : %d\r\n", pInfo->szFileName, pInfo->IsDirectory);
 		if (pInfo->IsDirectory) {    //处理"."和".."
 			if ((CString)pInfo->szFileName == "." || (CString)pInfo->szFileName == "..") {
 				int cmd = pClient->DealCommand();
@@ -151,6 +152,9 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_NOTIFY(NM_DBLCLK, IDC_TREE1_DIR, &CRemoteClientDlg::OnNMDblclkTree1Dir)
 	ON_NOTIFY(NM_CLICK, IDC_TREE1_DIR, &CRemoteClientDlg::OnNMClickTree1Dir)
 	ON_NOTIFY(NM_RCLICK, IDC_LIST1_FILE, &CRemoteClientDlg::OnNMRClickList1File)
+	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
+	ON_COMMAND(ID_DELETE_FILE, &CRemoteClientDlg::OnDeleteFile)
+	ON_COMMAND(ID_RUN_FILE, &CRemoteClientDlg::OnRunFile)
 END_MESSAGE_MAP()
 
 
@@ -301,7 +305,7 @@ void CRemoteClientDlg::OnNMRClickList1File(NMHDR* pNMHDR, LRESULT* pResult)
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
 	// TODO: 在此添加控件通知处理程序代码
 	*pResult = 0;
-	CPoint ptMouse, ptList;
+	CPoint ptMouse, ptList;      //TODO:函数作用了解
 	GetCursorPos(&ptMouse);
 	ptList = ptMouse;
 	mList.ScreenToClient(&ptList);
@@ -309,8 +313,65 @@ void CRemoteClientDlg::OnNMRClickList1File(NMHDR* pNMHDR, LRESULT* pResult)
 	if (ListSelected < 0) return;
 	CMenu menu;
 	menu.LoadMenu(IDR_MENU1_RCLICK);
-	CMenu* pPupup = menu.GetSubMenu(0);
+	CMenu* pPupup = menu.GetSubMenu(0);    
 	if (pPupup != NULL) {
 		pPupup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, ptMouse.x, ptMouse.y, this);
 	}
+}
+
+
+void CRemoteClientDlg::OnDownloadFile()
+{
+	int nListSelected = mList.GetSelectionMark();
+	CString strFile = mList.GetItemText(nListSelected, 0);
+	CFileDialog dlg(FALSE, NULL, strFile,  //TODO:
+		OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, NULL, this);
+	if (dlg.DoModal() == IDOK) {
+		FILE* pFile = fopen(dlg.GetPathName(), "wb+");    //TODO:
+		if (pFile == NULL) {
+			AfxMessageBox("文件无法创建!");
+			return;
+		}
+		HTREEITEM hSelected = mTree.GetSelectedItem();
+		strFile = GetPath(hSelected) + strFile;
+		TRACE("strFile : %s\r\n", LPCSTR(strFile));
+		int ret = SendCommendPacket(4, false, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
+		if (ret < 0) {
+			AfxMessageBox("执行下载命令失败!");
+			TRACE("下载失败 ret = %d\r\n", ret);
+			return;
+		}
+		CClientSocket* pClient = CClientSocket::getInstance();
+		long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
+		if (nLength == 0) {
+			AfxMessageBox("无法读取文件!");
+			return;
+		}
+		long long nCnt = 0;
+		while (nCnt < nLength) {
+			ret = pClient->DealCommand();
+			if (ret < 0) {
+				AfxMessageBox("传输失败!");
+				TRACE("传输失败 ret = %d\r\n", ret);
+				break;
+			}
+			fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().strData.size(), pFile);
+			nCnt += pClient->GetPacket().strData.size();
+		}
+		fclose(pFile);
+		pClient->CloseSocket();
+	}
+	
+}
+
+
+void CRemoteClientDlg::OnDeleteFile()
+{
+	// TODO: 在此添加命令处理程序代码
+}
+
+
+void CRemoteClientDlg::OnRunFile()
+{
+	// TODO: 在此添加命令处理程序代码
 }
