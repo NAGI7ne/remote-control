@@ -3,6 +3,7 @@
 #include "pch.h"
 #include "framework.h"
 #include <string>
+#include <vector>
 
 #pragma pack(push) 
 #pragma pack(1)
@@ -36,6 +37,7 @@ public:
 		size_t i = 0;
 		for (i; i < nSize; i++) {
 			if (*(WORD*)(pData + i) == 0xFEFF) {   //包头存在 
+				sHead = *(WORD*)(pData + i);
 				i += 2;    //跳过包头
 				break;
 			}
@@ -80,7 +82,7 @@ public:
 		}
 		return *this;
 	}
-	size_t Size() const {
+	size_t Size()  {
 		return nLength + 6;
 	}
 	const char* Data() {    //返回完整数据
@@ -116,26 +118,7 @@ typedef struct MouseEvent {
 	POINT ptXY;   //坐标
 }MOUSEEV, * PMOUSEEV;
 
-std::string GetErrorInfo(int wsaErrCode) {
-	std::string ret;
-	LPVOID lpMsgBuf = NULL;
-	FormatMessage(
-		//从系统提供的预定义错误消息资源中获取错误信息。
-		//让系统自动分配一个足够容纳错误信息文本的内存缓冲区。
-		FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER, 
-		//错误信息来源于系统而非自定义模块。
-		NULL,  
-		//需要查询错误的代码。
-		wsaErrCode, 
-		//构造一个“中性”语言环境，系统将基于默认的子语言返回错误字符串。
-		MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),  
-		(LPTSTR)&lpMsgBuf, 0, NULL);
-
-	ret = (char*)lpMsgBuf;
-	//系统为错误消息分配了内存，所以使用 LocalFree 来释放这块内存，避免内存泄漏。
-	LocalFree(lpMsgBuf);
-	return ret;
-}
+std::string GetErrorInfo(int wsaErrCode);
 
 //采用单例设计模式
 class CClientSocket
@@ -148,9 +131,10 @@ public:
 		return mInstance;
 	}
 	bool InitSocket(std::string stringIPAddr) {
+		if (mSock != INVALID_SOCKET) CloseSocket();
 		mSock = socket(PF_INET, SOCK_STREAM, 0);
 		if (mSock == -1) return false;
-		sockaddr_in servAddr, clntAddr;
+		sockaddr_in servAddr;
 		memset(&servAddr, 0, sizeof(servAddr));
 		servAddr.sin_family = AF_INET;
 		servAddr.sin_port = htons(9339);
@@ -170,29 +154,33 @@ public:
 #define BUFFER_SIZE 4096
 	int DealCommand() {
 		if (mSock == -1) return false;
-		char* buffer = new char[BUFFER_SIZE];
+		char* buffer = mBuffer.data();
 		memset(buffer, 0, BUFFER_SIZE);
 		size_t index = 0;
 		while (1) {
 			size_t len = recv(mSock, buffer + index, BUFFER_SIZE - index, 0);
 			if (len <= 0) return -1;
+			TRACE("client rev : %d\r\n", len);
 			index += len;
 			len = index;
 			mPacket = CPacket((BYTE*)buffer, len);
+			TRACE("客户端解包成功 cmd: %d\r\n", mPacket.sCmd);
 			if (len > 0) {
 				memcpy(buffer, buffer + len, BUFFER_SIZE - len);
 				index -= len;
 				return mPacket.sCmd;
 			}
 		}
+		return -1;
 	}
 	bool Send(const char* pData, int nSize) {
 		if (mSock == -1) return false;
 		return send(mSock, pData, nSize, 0) > 0;
 	}
-	bool Send(const CPacket& pack) {
+	bool Send(CPacket& pack) {
+		TRACE("mSock = %d\r\n", mSock);
 		if (mSock == -1) return false;
-		return send(mSock, (const char*)&pack, pack.nLength + 2 + 4, 0) > 0;
+		return send(mSock, pack.Data(), pack.Size(), 0) > 0;
 	}
 	bool GetFilePath(std::string& strPath)const {
 		if (mPacket.sCmd >= 2 && mPacket.sCmd <= 4) {
@@ -208,7 +196,15 @@ public:
 		}
 		return false;
 	}
+	CPacket& GetPacket() {
+		return mPacket;
+	}
+	void CloseSocket() {
+		closesocket(mSock);
+		mSock = INVALID_SOCKET;
+	}
 private:
+	std::vector<char> mBuffer;
 	SOCKET mSock;
 	CPacket mPacket;
 	// 禁用拷贝构造
@@ -221,7 +217,7 @@ private:
 			MessageBox(NULL, _T("无法初始化套接字环境，请检查网络设置"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
 			exit(0);
 		}
-		mSock = socket(PF_INET, SOCK_STREAM, 0);
+		mBuffer.resize(BUFFER_SIZE);
 	}
 	~CClientSocket() {
 		closesocket(mSock);

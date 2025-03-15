@@ -34,6 +34,7 @@ public:
 		size_t i = 0;
 		for (i; i < nSize; i++) {
 			if (*(WORD*)(pData + i) == 0xFEFF) {   //包头存在 
+				sHead = *(WORD*)(pData + i);
 				i += 2;    //跳过包头
 				break;
 			}
@@ -78,7 +79,7 @@ public:
 		}
 		return *this;
 	}
-	size_t Size() const{
+	size_t Size() {
 		return nLength + 6;
 	}
 	const char* Data(){    //返回完整数据
@@ -127,7 +128,7 @@ public:
 	bool InitSocket() {
 		mSock = socket(PF_INET, SOCK_STREAM, 0);
 		if (mSock == -1) return false;
-		sockaddr_in servAddr, clntAddr;
+		sockaddr_in servAddr;
 		memset(&servAddr, 0, sizeof(servAddr));
 		// 服务器可能不止一个ip地址,所监听所有，确保客户端能连上
 		servAddr.sin_addr.s_addr = INADDR_ANY; 
@@ -138,37 +139,49 @@ public:
 		return true;
 	}
 	bool AcceptClient() {
+		TRACE("enter AcceptClient\r\n");
 		sockaddr_in clntAddr;
 		int clntAddrSize = sizeof(clntAddr);
 		mClntSock = accept(mSock, (sockaddr*)&clntAddr, &clntAddrSize);
+		TRACE("mClnt = %d\r\n", mClntSock);
 		if (mClntSock == -1) return false;
+		return true;
 	}
 #define BUFFER_SIZE 4096
 	int DealCommand() {
 		if (mClntSock == -1) return false;
 		char* buffer = new char[BUFFER_SIZE];
+		if (buffer == NULL) {
+			TRACE("内存不足! \r\n");
+			return - 2;
+		}
 		memset(buffer, 0, BUFFER_SIZE);
 		size_t index = 0;
 		while (1) {
-			size_t len = recv(mSock, buffer + index, BUFFER_SIZE - index, 0);
-			if (len <= 0) return -1;
+			size_t len = recv(mClntSock, buffer + index, BUFFER_SIZE - index, 0);
+			if (len <= 0) { delete[] buffer; return -1; }
+			TRACE("server rev : %d\r\n", len);
 			index += len;
 			len = index;
 			mPacket = CPacket((BYTE*)buffer, len);
+			TRACE("服务器解包成功 cmd: %d\r\n", mPacket.sCmd);
 			if (len > 0) {
 				memcpy(buffer, buffer + len, BUFFER_SIZE - len);
 				index -= len;
+				delete[] buffer;
 				return mPacket.sCmd;
 			}
 		}
+		delete[] buffer;
+		return -1;
 	}
 	bool Send(const char* pData, int nSize) {
 		if (mClntSock == -1) return false;
 		return send(mClntSock, pData, nSize, 0) > 0;
 	}
-	bool Send(const CPacket& pack) {
+	bool Send(CPacket& pack) {
 		if (mClntSock == -1) return false;
-		return send(mClntSock, (const char*)&pack, pack.nLength + 2 + 4, 0) > 0; 
+		return send(mClntSock, pack.Data(), pack.Size(), 0) > 0;
 	}
 	bool GetFilePath(std::string &strPath)const {
 		if (mPacket.sCmd >= 2 && mPacket.sCmd <= 4) {
@@ -183,6 +196,13 @@ public:
 			return true;
 		}
 		return false;
+	}
+	CPacket& GetPacket() {
+		return mPacket;
+	}
+	void CloseClient() {
+		closesocket(mClntSock);
+		mClntSock = INVALID_SOCKET;
 	}
 private:
 	SOCKET mSock, mClntSock;
