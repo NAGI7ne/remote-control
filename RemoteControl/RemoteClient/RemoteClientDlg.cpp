@@ -151,6 +151,7 @@ void CRemoteClientDlg::LaodFileCurrent()
 	int nCmd = SendCommandPacket(2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength());
 	PFILEINFO pInfo = (PFILEINFO)CClientSocket::getInstance()->GetPacket().strData.c_str();
 	CClientSocket* pClient = CClientSocket::getInstance();
+	int cnt = 0;
 	while (pInfo->HasNext) {
 		TRACE("file[%s] Isdir : %d\r\n", pInfo->szFileName, pInfo->IsDirectory);
 		if (!pInfo->IsDirectory) {    //处理"."和".."
@@ -161,6 +162,7 @@ void CRemoteClientDlg::LaodFileCurrent()
 		if (cmd < 0) break;
 	}
 	pClient->CloseSocket();
+	TRACE("Count = %d\r\n", cnt);
 }
 
 BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)

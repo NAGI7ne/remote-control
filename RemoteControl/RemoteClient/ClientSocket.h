@@ -169,21 +169,21 @@ public:
 	int DealCommand() {
 		if (mSock == -1) return false;
 		char* buffer = mBuffer.data();
-		memset(buffer, 0, BUFFER_SIZE);
-		size_t index = 0;
+		//memset(buffer, 0, BUFFER_SIZE);
+
+		// index记录当前缓冲区中累计的有效数据长度
+		//确保未处理的数据保留在缓冲区的前部，为后续数据接收做好准备
+		static size_t index = 0;    
 		while (1) {
 			size_t len = recv(mSock, buffer + index, BUFFER_SIZE - index, 0);
-			if (len <= 0 && (index <= 0)) return -1;
-			//TRACE(" \r\n");
-			//TRACE(" \r\n");
-			//TRACE(" \r\n",len);
-			TRACE("client rev file: %d\r\n", len);
+			if (len <= 0 && (index == 0)) return -1;  //如果没接收到数据并且缓冲区没有数据
+			TRACE("client rev : %d\r\n", len);
 			index += len;
 			len = index;
 			mPacket = CPacket((BYTE*)buffer, len);
 			//TRACE("客户端解包成功 cmd: %d\r\n", mPacket.sCmd);
 			if (len > 0) {
-				memcpy(buffer, buffer + len, BUFFER_SIZE - len);
+				memcpy(buffer, buffer + len, index - len);  //这里是index-len，易错
 				index -= len;
 				return mPacket.sCmd;
 			}

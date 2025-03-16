@@ -83,10 +83,11 @@ int MakeDirectoryInfo() {
         TRACE("FileName :%s\r\n", finfo.szFileName);
         CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
         //Dump((BYTE*)pack.Data(), pack.Size());
-        Sleep(5);  //确保数据能正常被服务器收到
+        //Sleep(5);  //确保数据能正常被服务器收到
         CServerSocket::getInstance()->Send(pack);
+        count++;
     } while (!_findnext(hfind, &fdata));
-    //TRACE("server: count = %d\r\n", count);
+    TRACE("server: count = %d\r\n", count);
     FILEINFO finfo;
     finfo.HasNext = FALSE;
     CPacket pack(2, (BYTE*)&finfo, sizeof(finfo));
@@ -321,7 +322,7 @@ int DeleteLocalFile() {
     CServerSocket::getInstance()->GetFilePath(strPath);
     TCHAR sPath[MAX_PATH] = _T("");
     MultiByteToWideChar(CP_ACP, 0, strPath.c_str(), 
-        strPath.size(), sPath, sizeof(sPath) / sizeof(TCHAR));
+        strPath.size(), sPath, sizeof(sPath) / sizeof(TCHAR)); 
     DeleteFileA(strPath.c_str());
     CPacket pack(9, NULL, 0);
     bool ret = CServerSocket::getInstance()->Send(pack);
