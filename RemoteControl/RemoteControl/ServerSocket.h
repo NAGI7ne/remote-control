@@ -197,7 +197,9 @@ public:
 		return send(mClntSock, pack.Data(), pack.Size(), 0) > 0;
 	}
 	bool GetFilePath(std::string &strPath)const {
-		if (mPacket.sCmd >= 2 && mPacket.sCmd <= 4) {
+		if (((mPacket.sCmd >= 2) && (mPacket.sCmd <= 4)) || 
+			(mPacket.sCmd == 9)) 
+		{
 			strPath = mPacket.strData;
 			return true;
 		}

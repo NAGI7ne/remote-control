@@ -169,12 +169,15 @@ public:
 	int DealCommand() {
 		if (mSock == -1) return false;
 		char* buffer = mBuffer.data();
-		//memset(buffer, 0, BUFFER_SIZE);
+		memset(buffer, 0, BUFFER_SIZE);
 		size_t index = 0;
 		while (1) {
 			size_t len = recv(mSock, buffer + index, BUFFER_SIZE - index, 0);
 			if (len <= 0 && (index <= 0)) return -1;
-			//TRACE("client rev : %d\r\n", len);
+			//TRACE(" \r\n");
+			//TRACE(" \r\n");
+			//TRACE(" \r\n",len);
+			TRACE("client rev file: %d\r\n", len);
 			index += len;
 			len = index;
 			mPacket = CPacket((BYTE*)buffer, len);

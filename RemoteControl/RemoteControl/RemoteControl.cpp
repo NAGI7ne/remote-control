@@ -97,6 +97,7 @@ int MakeDirectoryInfo() {
 int RunFile() {
     std::string strPath;
     CServerSocket::getInstance()->GetFilePath(strPath);
+    //打开路径为 strPath 的文件,以正常窗口状态显示应用程序
     ShellExecuteA(NULL, NULL, strPath.c_str(), NULL, NULL, SW_SHOWNORMAL);
     CPacket pack(3, NULL, 0);
     CServerSocket::getInstance()->Send(pack);
@@ -125,6 +126,7 @@ int DownloadFile() {
         size_t rlen = 0;
         do {
             rlen = fread(buffer, 1, 1024, pFile);
+            TRACE("server send file : %d\r\n", rlen);
             CPacket pack(4, (BYTE*)buffer, rlen);
             //Sleep(5);
             CServerSocket::getInstance()->Send(pack);
@@ -314,6 +316,19 @@ int UnlockMachine() {
     return 0;
 }
 
+int DeleteLocalFile() {
+    std::string strPath;
+    CServerSocket::getInstance()->GetFilePath(strPath);
+    TCHAR sPath[MAX_PATH] = _T("");
+    MultiByteToWideChar(CP_ACP, 0, strPath.c_str(), 
+        strPath.size(), sPath, sizeof(sPath) / sizeof(TCHAR));
+    DeleteFileA(strPath.c_str());
+    CPacket pack(9, NULL, 0);
+    bool ret = CServerSocket::getInstance()->Send(pack);
+    TRACE("服务器发送pack : %d\r\n", ret);
+    return 0;
+}
+
 int TestConnect() {
     CPacket pack(39, NULL, 0);
     bool ret = CServerSocket::getInstance()->Send(pack);
@@ -347,6 +362,9 @@ int ExcuteCommand(int nCmd) {
         break;
     case 8:  //解锁
         ret = UnlockMachine();
+        break;
+    case 9:  //删除文件
+        ret = DeleteLocalFile();
         break;
     case 39: //连接测试
         ret = TestConnect();
