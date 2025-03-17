@@ -165,7 +165,7 @@ public:
 		}
 		return true;
 	}
-#define BUFFER_SIZE 4096
+#define BUFFER_SIZE 2048000
 	int DealCommand() {
 		if (mSock == -1) return false;
 		char* buffer = mBuffer.data();

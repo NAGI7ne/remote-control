@@ -245,7 +245,7 @@ int SendScreen() {
     IStream* pStream = NULL;
     HRESULT ret = CreateStreamOnHGlobal(hMem, TRUE, &pStream); //将分配的全局内存包装成一个流对象（此函数需要可移动的全局内存块）
     if (ret == S_OK) {
-        screen.Save(pStream, Gdiplus::ImageFormatPNG); //将图像保存到流中
+        screen.Save(pStream, Gdiplus::ImageFormatJPEG); //将图像保存到流中
         LARGE_INTEGER bg{ 0 };
         pStream->Seek(bg, STREAM_SEEK_SET, NULL);//Save写完后流的内部指针通常会位于数据的末尾, 需要从头开始
         BYTE* pData = (BYTE*)GlobalLock(hMem);
@@ -254,9 +254,9 @@ int SendScreen() {
         CServerSocket::getInstance()->Send(pack);
         GlobalUnlock(hMem);
     }
-    //screen.Save(_T("test.png"), Gdiplus::ImageFormatPNG);
-    //DWORD tick = GetTickCount64();
-    //TRACE("png %d\r\n", GetTickCount64() - tick);
+    /*screen.Save(_T("test.jpg"), Gdiplus::ImageFormatJPEG);
+    DWORD tick = GetTickCount64();
+    TRACE("jpg %d\r\n", GetTickCount64() - tick);*/
     pStream->Release();
     GlobalFree(hMem);
     screen.ReleaseDC();

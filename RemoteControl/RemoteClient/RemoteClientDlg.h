@@ -46,6 +46,9 @@ private:
 public:
 	bool isFull() const { return mImageIsFull; }
 	CImage& GetImage() { return mImage; }
+	void SetImageStatus(bool isFull = false) {
+		mImageIsFull = isFull;
+	}
 
 // 实现
 protected:
