@@ -43,6 +43,9 @@ private:
 private:
 	CImage mImage;  //作图像缓存
 	bool mImageIsFull;  //缓存是否有数据
+public:
+	bool isFull() const { return mImageIsFull; }
+	CImage& GetImage() { return mImage; }
 
 // 实现
 protected:
@@ -70,4 +73,5 @@ public:
 	afx_msg void OnDeleteFile();
 	afx_msg void OnRunFile();
 	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);  //TODO参数含义    (定义自定义消息响应函数②)
+	afx_msg void OnBnClickedBtnStartWatch();
 };
