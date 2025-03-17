@@ -43,12 +43,11 @@ private:
 private:
 	CImage mImage;  //作图像缓存
 	bool mImageIsFull;  //缓存是否有数据
+	bool mIsThreadClosed;  //监视线程是否关闭
 public:
 	bool isFull() const { return mImageIsFull; }
 	CImage& GetImage() { return mImage; }
-	void SetImageStatus(bool isFull = false) {
-		mImageIsFull = isFull;
-	}
+	void SetImageStatus(bool isFull = false) { mImageIsFull = isFull; }
 
 // 实现
 protected:
