@@ -239,7 +239,6 @@ void CRemoteClientDlg::threadWatchFile()
 	do {
 		pClient = CClientSocket::getInstance();    //确保能拿到实体
 	} while (pClient == NULL);
-	ULONGLONG tick = GetTickCount64();
 	for (;;) {
 		if (mImageIsFull == false) {   //更新数据到缓存
 			int ret = SendMessage(WM_SEND_PACKET, 6 << 1 | 1); //TODO:
@@ -504,7 +503,12 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)   //实现�
 			int ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());  //TODO
 		}
 		break;
-	case 6:
+	case 5:
+		{
+			ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)lParam, sizeof(MOUSEEV));
+		}
+		break;
+	case 6:   
 		{
 			ret = SendCommandPacket(cmd, wParam & 1);
 		}
