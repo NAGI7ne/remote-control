@@ -4,6 +4,9 @@
 
 #pragma once
 #include "ClientSocket.h"
+#include "StatusDlg.h"
+
+#define WM_SEND_PACKET (WM_USER+1) //TODO:  (发送数据包消息①)
 
 // CRemoteClientDlg 对话框
 class CRemoteClientDlg : public CDialogEx
@@ -17,7 +20,7 @@ public:
 	enum { IDD = IDD_REMOTECLIENT_DIALOG };
 #endif
 
-	protected:
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 
 private:
@@ -32,9 +35,19 @@ private:
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 	void LoadFileInfo();
 	void LaodFileCurrent();
+	static void threadEntryForDownFile(void* arg);   //TODO:这里为什么是static
+	void threadDownFile();
+	static void threadEntryForWatchData(void* arg);  //静态函数不能用this指针
+	void threadWatchFile();
+
+private:
+	CImage mImage;  //作图像缓存
+	bool mImageIsFull;  //缓存是否有数据
+
 // 实现
 protected:
 	HICON m_hIcon;
+	CStatusDlg mDlgStatus;
 
 	// 生成的消息映射函数
 	virtual BOOL OnInitDialog();
@@ -52,8 +65,9 @@ public:
 	afx_msg void OnNMClickTree1Dir(NMHDR* pNMHDR, LRESULT* pResult);
 	// 显示文件
 	CListCtrl mList;
-	afx_msg void OnNMRClickList1File(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnNMRClickList1File(NMHDR* pNMHDR, LRESULT* pResult);  //TODO：参数含义
 	afx_msg void OnDownloadFile();
 	afx_msg void OnDeleteFile();
 	afx_msg void OnRunFile();
+	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);  //TODO参数含义    (定义自定义消息响应函数②)
 };

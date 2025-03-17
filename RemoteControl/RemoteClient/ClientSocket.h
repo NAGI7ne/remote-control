@@ -176,7 +176,7 @@ public:
 		static size_t index = 0;    
 		while (1) {
 			size_t len = recv(mSock, buffer + index, BUFFER_SIZE - index, 0);
-			if (len <= 0 && (index == 0)) return -1;  //如果没接收到数据并且缓冲区没有数据
+			if (len <= 0 && (index <= 0)) return -1;  //如果没接收到数据并且缓冲区没有数据
 			TRACE("client rev : %d\r\n", len);
 			index += len;
 			len = index;
