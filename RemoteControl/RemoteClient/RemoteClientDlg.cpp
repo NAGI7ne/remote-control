@@ -70,7 +70,7 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 
 int CRemoteClientDlg::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t length)
 {
-	UpdateData();  //TODO
+	UpdateData();  //在对话框的控件和类的成员变量之间进行数据同步
 	CClientSocket* pClient = CClientSocket::getInstance();
 	bool ret = pClient->InitSocket(mServAddr, atoi((LPCTSTR)mNport));
 	if (ret == NULL) {
@@ -134,7 +134,7 @@ void CRemoteClientDlg::LoadFileInfo()
 			mTree.InsertItem("", hTemp, TVI_LAST);
 		}
 		else {
-			mList.InsertItem(0, pInfo->szFileName);   //TODO:什么意思
+			mList.InsertItem(0, pInfo->szFileName);  //0：列表的第 0 行（第一行）插入
 		}
 		
 		int cmd = pClient->DealCommand();
@@ -156,7 +156,7 @@ void CRemoteClientDlg::LaodFileCurrent()
 	while (pInfo->HasNext) {
 		TRACE("file[%s] Isdir : %d\r\n", pInfo->szFileName, pInfo->IsDirectory);
 		if (!pInfo->IsDirectory) {    //处理"."和".."
-			mList.InsertItem(0, pInfo->szFileName);   //TODO:什么意思
+			mList.InsertItem(0, pInfo->szFileName);  
 		}
 		int cmd = pClient->DealCommand();
 		TRACE("ack : %d\r\n", cmd);
@@ -177,10 +177,12 @@ void CRemoteClientDlg::threadDownFile()
 {
 	int nListSelected = mList.GetSelectionMark();
 	CString strFile = mList.GetItemText(nListSelected, 0);
-	CFileDialog dlg(FALSE, NULL, strFile,  //TODO:
-		OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, NULL, this);
+	CFileDialog dlg(FALSE, NULL, strFile,						//创建一个“保存文件”对话框（第一个参数为 FALSE 表示保存文件，若为 TRUE 则为打开文件）。
+		OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, NULL, this);    //NULL：不指定缺省的扩展名
+															    //OFN_HIDEREADONLY 隐藏只读复选框 OFN_OVERWRITEPROMPT 如果文件已存在，则提示用户是否覆盖
 	if (dlg.DoModal() == IDOK) {
-		FILE* pFile = fopen(dlg.GetPathName(), "wb+");    //TODO:
+		FILE* pFile = fopen(dlg.GetPathName(), "wb+");    //取得用户在对话框中选择的文件完整路径
+														  //二进制写入模式打开（或创建）文件 
 		if (pFile == NULL) {
 			AfxMessageBox("文件无法创建!");
 			mDlgStatus.ShowWindow(SW_HIDE);
@@ -193,7 +195,7 @@ void CRemoteClientDlg::threadDownFile()
 		CClientSocket* pClient = CClientSocket::getInstance();
 		do {
 			//int ret = SendCommandPacket(4, false, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());
-			int ret = SendMessage(WM_SEND_PACKET, 4 << 1 | 0, (LPARAM)(LPCTSTR)strFile); //TODO:
+			int ret = SendMessage(WM_SEND_PACKET, 4 << 1 | 0, (LPARAM)(LPCTSTR)strFile);
 			if (ret < 0) {
 				AfxMessageBox("执行下载命令失败!");
 				TRACE("下载失败 ret = %d\r\n", ret);
@@ -229,7 +231,7 @@ void CRemoteClientDlg::threadEntryForWatchData(void* arg)
 {
 	CRemoteClientDlg* thiz = (CRemoteClientDlg*)arg;
 	thiz->threadWatchFile();
-	_endthread();
+	_endthread();  //标识线程执行完毕，清理 CRT 资源
 }
 
 void CRemoteClientDlg::threadWatchFile()
@@ -241,7 +243,7 @@ void CRemoteClientDlg::threadWatchFile()
 	} while (pClient == NULL);
 	while(!mIsThreadClosed){
 		if (mImageIsFull == false) {   //更新数据到缓存
-			int ret = SendMessage(WM_SEND_PACKET, 6 << 1 | 1); //TODO:
+			int ret = SendMessage(WM_SEND_PACKET, 6 << 1 | 1); 
 			if (ret == 6) {
 				BYTE* pData = (BYTE*)pClient->GetPacket().strData.c_str();
 				HGLOBAL hMem = GlobalAlloc(GMEM_MOVEABLE, 0);
@@ -255,7 +257,7 @@ void CRemoteClientDlg::threadWatchFile()
 				if (hRet == S_OK) {
 					ULONG length = 0;
 					pStream->Write(pData, pClient->GetPacket().Size(), &length);
-					LARGE_INTEGER bg{ 0 };   // TODO:
+					LARGE_INTEGER bg{ 0 };  
 					pStream->Seek(bg, STREAM_SEEK_SET, NULL);
 					if ((HBITMAP)mImage != NULL) mImage.Destroy();
 					mImage.Load(pStream);
@@ -318,14 +320,12 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	SetIcon(m_hIcon, TRUE);			// 设置大图标
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
-	// TODO: 在此添加额外的初始化代码
-	//从对话框上的控件（例如编辑框、复选框等）中提取当前的内容，并把这些数据写入关联的成员变量中。
-	UpdateData();  
+	
+	UpdateData();  //从对话框上的控件（例如编辑框、复选框等）中提取当前的内容，并把这些数据写入关联的成员变量中。
 	mServAddr = 0xC0A8A084;  //192.168.160.132
 	mNport = _T("9339");
-	//FALSE 时,UpdateData 则会把成员变量的值更新到对话框控件上（通常用于在对话框初始化时显示默认值）。
-	UpdateData(FALSE);
-	mDlgStatus.Create(IDD_DLG_STATUS, this);   //TODO：这里this是什么
+	UpdateData(FALSE);   //FALSE 时,UpdateData 则会把成员变量的值更新到对话框控件上（通常用于在对话框初始化时显示默认值）。
+	mDlgStatus.Create(IDD_DLG_STATUS, this);  
 	mDlgStatus.ShowWindow(SW_HIDE);
 	mImageIsFull = false;
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
@@ -436,17 +436,18 @@ void CRemoteClientDlg::OnNMRClickList1File(NMHDR* pNMHDR, LRESULT* pResult)
 	LPNMITEMACTIVATE pNMItemActivate = reinterpret_cast<LPNMITEMACTIVATE>(pNMHDR);
 	// TODO: 在此添加控件通知处理程序代码
 	*pResult = 0;
-	CPoint ptMouse, ptList;      //TODO:函数作用了解
-	GetCursorPos(&ptMouse);
+	CPoint ptMouse, ptList;      
+	GetCursorPos(&ptMouse); //鼠标当前在屏幕上的坐标
 	ptList = ptMouse;
-	mList.ScreenToClient(&ptList);
-	int ListSelected = mList.HitTest(ptList);
+	mList.ScreenToClient(&ptList);  //将屏幕坐标转换为相对于列表控件（mList）客户端区域的坐标
+	int ListSelected = mList.HitTest(ptList);  //判断点击的位置是否落在某个列表项内
 	if (ListSelected < 0) return;
 	CMenu menu;
 	menu.LoadMenu(IDR_MENU1_RCLICK);
-	CMenu* pPupup = menu.GetSubMenu(0);    
+	CMenu* pPupup = menu.GetSubMenu(0);    //取得菜单中的第一个子菜单
 	if (pPupup != NULL) {
-		pPupup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, ptMouse.x, ptMouse.y, this);
+		pPupup->TrackPopupMenu(TPM_LEFTALIGN | TPM_RIGHTBUTTON, ptMouse.x, ptMouse.y, this);  //指定菜单项的对齐方式以及用右键来做菜单的选中操作。
+
 	}
 }
 
@@ -494,19 +495,20 @@ void CRemoteClientDlg::OnRunFile()
 
 LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)   //实现消息函数④
 {
+	 
 	int ret = 0;
-	int cmd = wParam >> 1;
+	int cmd = wParam >> 1;// eg: 收到的wParam是11 1011 右移一位：0101（5） 到case 5
 	switch (cmd)
 	{
 	case 4:
 		{
 			CString strFile = (LPCTSTR)lParam;
-			int ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());  //TODO:
+			int ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)(LPCTSTR)strFile, strFile.GetLength());  
 		}
 		break;
 	case 5:
 		{
-			ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)lParam, sizeof(MOUSEEV));
+			ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)lParam, sizeof(MOUSEEV));  // 1011 & 1 = 1， 设置为true
 		}
 		break;
 	case 6:
@@ -529,8 +531,13 @@ void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
 	mIsThreadClosed = false;
 	CWatchDialog dlg(this);
-	HANDLE hThread = (HANDLE)_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);    //TODO
-	dlg.DoModal();  //TODO:
+	//_beginthread 返回的是线程 ID 而非真正的内核句柄
+	// 最好使用 _beginthreadex
+	HANDLE hThread = (HANDLE)_beginthread(CRemoteClientDlg::threadEntryForWatchData, 0, this);    
+	dlg.DoModal();  //启动对话框的模态循环，模态对话框会阻塞当前线程的其他操作，直到用户关闭对话框。
 	mIsThreadClosed = true;
-	WaitForSingleObject(hThread, 500);    //TODO:
+	WaitForSingleObject(hThread, 500);    //等待后台线程在最多 500 毫秒内结束运行，会阻塞当前线程 直到后台线程退出或超时
+										  //线程函数内部虽然调用了 _endthread()，线程的实际终止过程也依赖于操作系统的调度。
+										 //所以Wait确保线程有足够时间进行清理，避免线程资源泄漏
+										
 }

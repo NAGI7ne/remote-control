@@ -62,15 +62,18 @@ BOOL CWatchDialog::OnInitDialog()
 	CDialog::OnInitDialog();
 
 	// TODO:  在此添加额外的初始化
-	SetTimer(0, 30, NULL);
+	SetTimer(0, 30, NULL);   //设置了一个 ID 为 0 的定时器，定时器周期为 30 毫秒
+							 //NULL 表示使用默认的消息回调方式
+							 //即定时器消息将通过窗口消息 WM_TIMER 传递给该对话框的 OnTimer 成员函数。
+							 //消息包含定时器的 ID:0
 	return TRUE;  // return TRUE unless you set the focus to a control
 	// 异常: OCX 属性页应返回 FALSE
 }
 
 
-void CWatchDialog::OnTimer(UINT_PTR nIDEvent)   //TODO:工作顺序，原理
+void CWatchDialog::OnTimer(UINT_PTR nIDEvent)   
 {
-	if (nIDEvent == 0) {
+	if (nIDEvent == 0) {  //收到ID为0的定时器的消息
 		CRemoteClientDlg* pParent = (CRemoteClientDlg*)GetParent();
 		if (pParent->isFull()) {
 			CRect rect;
@@ -80,13 +83,15 @@ void CWatchDialog::OnTimer(UINT_PTR nIDEvent)   //TODO:工作顺序，原理
 			if (m_nObjHeight == -1) m_nObjHeight = pParent->GetImage().GetHeight();
 			//将图像缩放
 			pParent->GetImage().StretchBlt(mPicture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(),SRCCOPY);
-			mPicture.InvalidateRect(NULL);  //TODO:
-			pParent->GetImage().Destroy();
+			mPicture.InvalidateRect(NULL);  //将整个 mPicture 区域标记为“无效”，通知 Windows 系统需要重绘该控件
+											//系统会在空闲时触发 WM_PAINT 消息，调用控件的重绘函数
+											// 使刚刚绘制好的图像显示出来
+			pParent->GetImage().Destroy();  //释放图像所占用的资源
 			pParent->SetImageStatus();
 		}
 	}
 	 
-	CDialog::OnTimer(nIDEvent);
+	CDialog::OnTimer(nIDEvent);  //调用基类的 OnTimer 可以确保消息得到完整的默认处理
 }
 
 
@@ -116,7 +121,11 @@ void CWatchDialog::OnLButtonDown(UINT nFlags, CPoint point)
 		event.nButton = 0;  //左键
 		event.nAction = 2;  //按下
 		CRemoteClientDlg* pParent = (CRemoteClientDlg*)GetParent();
-		pParent->SendMessage(WM_SEND_PACKET, 5 << 1 | 1, (WPARAM) & event);    //TODO:
+		pParent->SendMessage(WM_SEND_PACKET, 5 << 1 | 1, (WPARAM) & event);    
+		// 要设置的值是 5，true 所以 或上 1
+		// 5 表示为 101。左移 1 位后变成 1010，也就是十进制的 10
+		//再与 0001 按位或，结果为 1011，等于 11。
+		//更进一步见 RemoteClientDlg 的 CRemoteClientDlg::OnSendPacket
 	}
 	CDialog::OnLButtonDown(nFlags, point);
 }
@@ -218,7 +227,7 @@ void CWatchDialog::OnOK()
 {
 	// TODO: 在此添加专用代码和/或调用基类
 
-	//CDialog::OnOK();
+	//CDialog::OnOK();   // 禁用窗口Enter操作
 }
 
 
