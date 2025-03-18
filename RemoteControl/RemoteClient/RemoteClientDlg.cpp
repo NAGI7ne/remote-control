@@ -321,7 +321,7 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	// TODO: 在此添加额外的初始化代码
 	//从对话框上的控件（例如编辑框、复选框等）中提取当前的内容，并把这些数据写入关联的成员变量中。
 	UpdateData();  
-	mServAddr = 0x7F000001;
+	mServAddr = 0xC0A8A084;  //192.168.160.132
 	mNport = _T("9339");
 	//FALSE 时,UpdateData 则会把成员变量的值更新到对话框控件上（通常用于在对话框初始化时显示默认值）。
 	UpdateData(FALSE);
@@ -509,7 +509,9 @@ LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)   //实现�
 			ret = SendCommandPacket(cmd, wParam & 1, (BYTE*)lParam, sizeof(MOUSEEV));
 		}
 		break;
-	case 6:   
+	case 6:
+	case 7:
+	case 8:   
 		{
 			ret = SendCommandPacket(cmd, wParam & 1);
 		}

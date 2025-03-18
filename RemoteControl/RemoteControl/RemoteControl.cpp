@@ -267,22 +267,42 @@ int SendScreen() {
 CLockInfoDialog dlg;  //需要多次调用，用全局变量
 unsigned threadid = 0;
 
-unsigned threadLockDlg(void* arg) {
+unsigned __stdcall threadLockDlg(void* arg) {
     TRACE("%s (%d) : %d\r\n", __FUNCTION__, __LINE__, GetCurrentThreadId());
-    CRect rect;
-    /*rect.left = 0;
-    rect.top = 0;
-    rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
-    rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);*/  //获取整个屏幕
     dlg.Create(IDD_DIALOG1_INFO, NULL);
     dlg.ShowWindow(SW_SHOW);
+    //dlg.CenterWindow();
+    CRect rect;
+    //rect.left = 0;
+    //rect.top = 0;
+    //rect.right = GetSystemMetrics(SM_CXFULLSCREEN);
+    //rect.bottom = GetSystemMetrics(SM_CYFULLSCREEN);  //获取整个屏幕
+    //rect.bottom = LONG(rect.bottom * 1.10);
+    //TRACE("right = %d bottom = %d\r\n", rect.right, rect.bottom);
+    //dlg.MoveWindow(rect);
+    //CWnd* pText = dlg.GetDlgItem(IDC_STATIC);
+    //if (pText) {
+    //    CRect rtText;
+    //    pText->GetWindowRect(rtText);
+    //    int nWidth = rtText.Width();
+    //    int x = (rect.right - nWidth) / 2;
+    //    int nHeight = rtText.Height();
+    //    int y = (rect.bottom - nHeight) / 2;
+    //    pText->MoveWindow(x, y, rtText.Width(), rtText.Height());
+    //}
+
     dlg.SetWindowPos(&dlg.wndTopMost, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);  //窗口置顶，设置不能移动，不能改变大小
-    //ShowCursor(false);   //取消鼠标显示
+    ShowCursor(false);   //取消鼠标显示
     ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_HIDE);  //隐藏任务栏
+
     dlg.GetWindowRect(rect);   //获取窗口
-    //ClipCursor(rect);   //将鼠标限制在窗口
+    /*rect.left = 0;
+    rect.top = 0;
+    rect.right = 1;
+    rect.bottom = 1;*/
     rect.right = rect.left + 1;
     rect.bottom = rect.top + 1;
+    TRACE("right = %d, left = %d\r\n", rect.right, rect.left);
     ClipCursor(rect);   //将鼠标限制在一个像素点
     MSG msg;
     while (GetMessage(&msg, NULL, 0, 0)) {
@@ -293,8 +313,9 @@ unsigned threadLockDlg(void* arg) {
             if (msg.wParam == 0x1B)  break;  //按ESC退出
         }
     }
+    ClipCursor(NULL); 
     ::ShowWindow(::FindWindow(_T("Shell_TrayWnd"), NULL), SW_SHOW);  //显示任务栏
-    //ShowCursor(true);
+    ShowCursor(true);
     dlg.DestroyWindow();
     _endthreadex(0);
     return 0;
@@ -302,9 +323,10 @@ unsigned threadLockDlg(void* arg) {
 
 int LockMachine() {
     //锁机放入线程运行
-    if((dlg.m_hWnd == NULL) || (dlg.m_hWnd == INVALID_HANDLE_VALUE) )
-        _beginthreadex(NULL, 0, threadLockDlg, NULL, 0, &threadid), 
-        TRACE("thread = %d\r\n", threadid);
+    if ((dlg.m_hWnd == NULL) || (dlg.m_hWnd == INVALID_HANDLE_VALUE)) {
+        _beginthreadex(NULL, 0, threadLockDlg, NULL, 0, &threadid),
+            TRACE("thread = %d\r\n", threadid);
+    }
     CPacket pack(7, NULL, 0);
     CServerSocket::getInstance()->Send(pack);
     return 0;
