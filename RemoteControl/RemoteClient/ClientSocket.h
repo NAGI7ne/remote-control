@@ -82,7 +82,7 @@ public:
 		}
 		return *this;
 	}
-	size_t Size()  {
+	int Size()  {
 		return nLength + 6;
 	}
 	const char* Data() {    //返回完整数据
