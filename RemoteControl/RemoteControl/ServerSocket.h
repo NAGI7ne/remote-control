@@ -21,7 +21,7 @@ public:
 		bool ret = InitSocket(port);
 		if (ret == false) return -1;
 		std::list<CPacket> lstPacket;
-		mCallback = callback;
+		mCallback = callback;  //使 mCallback 指向 CCommand::RunCommand
 		mArg = arg;
 		int cnt = 0;
 		while (true) {
@@ -31,11 +31,12 @@ public:
 				}
 				cnt++;
 			}
-			int ret = DealCommand();
+			int ret = DealCommand();  
 			if (ret > 0) {
-				mCallback(mArg, ret, lstPacket, mPacket);
+				mCallback(mArg, ret, lstPacket, mPacket); //调用操作符 () 把参数传递给 mCallback 所指向的函数
+														  //并立即执行mCallback指向的函数。
 				while (lstPacket.size() > 0) {
-					Send(lstPacket.front());
+					Send(lstPacket.front());   //从队列中取包，完成发送，弹出
 					lstPacket.pop_front();
 				}
 			}
@@ -69,6 +70,8 @@ protected:
 		return true;
 	}
 #define BUFFER_SIZE 4096
+	//接收数据，提取数据
+	//构造数据包，并提取命令号
 	int DealCommand() {
 		if (mClntSock == -1) return -1;
 		char* buffer = new char[BUFFER_SIZE];
@@ -104,25 +107,13 @@ protected:
 		if (mClntSock == -1) return false;
 		return send(mClntSock, pack.Data(), pack.Size(), 0) > 0;
 	}
-	bool GetFilePath(std::string &strPath)const {
-		if (((mPacket.sCmd >= 2) && (mPacket.sCmd <= 4)) || 
-			(mPacket.sCmd == 9)) 
-		{
-			strPath = mPacket.strData;
-			return true;
-		}
-		return false;
-	}
-	bool GetMouseEvent(MOUSEEV& mouse) {
+	/*bool GetMouseEvent(MOUSEEV& mouse) {
 		if (mPacket.sCmd == 5) {
 			memcpy(&mouse, mPacket.strData.c_str(), mPacket.strData.size());
 			return true;
 		}
 		return false;
-	}
-	CPacket& GetPacket() {
-		return mPacket;
-	}
+	}*/
 	void CloseClient() {
 		if (mClntSock != INVALID_SOCKET) {
 			closesocket(mClntSock);

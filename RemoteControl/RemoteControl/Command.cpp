@@ -30,5 +30,6 @@ int CCommand::ExcuteCommand(int nCmd, std::list<CPacket>& lstPacket, CPacket& in
 	if (it == mMapFunction.end()) {
 		return - 1;
 	}
+	//进入函数指针指向的函数完成业务，将对应的包压入包队列中
 	return (this->*it->second)(lstPacket, inPacket);
 }

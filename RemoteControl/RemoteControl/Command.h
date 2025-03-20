@@ -10,14 +10,17 @@
 #include "LockInfoDialog.h"
 #include "Resource.h"
 
-class CCommand
+class CCommand    
 {
-public:    //TODO：为什么有Init（）的需求的话就不用工具类
-	//static void Init();
-	//static int ExcuteCommand(int nCmd);
+public:    
 	CCommand();
 	~CCommand() {}
 	int ExcuteCommand(int nCmd, std::list<CPacket>& lstPacket, CPacket& inPacket);
+	//用作回调函数
+	//静态成员函数没有隐式的 this 指针
+	//因此其函数指针与传统 C 风格的函数指针兼容
+	//可以直接赋值给 SOCKET_CALLBACK 变量
+	//typedef void (*SOCKET_CALLBACK)(void*, int, std::list<CPacket>&, CPacket&);
 	static void RunCommand(void* arg, int status, std::list<CPacket>& lstPacket, CPacket& inPacket) {
 		CCommand* thiz = (CCommand*)arg;
 		if (status > 0) {
@@ -29,7 +32,9 @@ public:    //TODO：为什么有Init（）的需求的话就不用工具类
 			MessageBox(NULL, _T("无法接入用户，自动重试"), _T("网络初始化失败!"), MB_OK | MB_ICONERROR);
 	}
 protected:
-	typedef int(CCommand::* CMDFUNC)(std::list<CPacket>&, CPacket&); //成员函数指针  //TODO:
+	// int (CCommand::*)：表示“指向 CCommand 类成员函数”的指针
+	// 而且这个成员函数返回一个 int 值。
+	typedef int(CCommand::* CMDFUNC)(std::list<CPacket>&, CPacket&); //成员函数指针  
 	std::map<int, CMDFUNC> mMapFunction; // 从命令号到功能的映射
 	//作用使 ExcuteCommand 变得简洁
 	CLockInfoDialog dlg;  //需要多次调用，用全局变量
@@ -172,7 +177,9 @@ protected:
 			} while (rlen >= 1024);
 			fclose(pFile);
 		}
-		lstPacket.push_back(CPacket(4, NULL, 0));
+		else {
+			lstPacket.push_back(CPacket(4, NULL, 0));
+		}
 		return 0;
 	}
 

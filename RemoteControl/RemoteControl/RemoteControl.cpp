@@ -36,7 +36,8 @@ int main()
         }
         else
         {
-            CCommand cmd;
+            CCommand cmd; //CCommand 类封装了所有命令的处理函数
+                          //创建CCommand实体使回调函数能通过这个来调用CCommand的方法
             //实例在main前已被初始化，这里申请一个指针来操作这个实例
             int ret = CServerSocket::getInstance()->Run(&CCommand::RunCommand, &cmd);
             switch (ret) {
