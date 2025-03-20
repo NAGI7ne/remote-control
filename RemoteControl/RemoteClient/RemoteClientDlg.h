@@ -27,25 +27,19 @@ protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
 
 private:
-	// 1:查看磁盘分区    2:查看指定目录文件
-	// 3:打开文件        4:下载文件  
-	// 5:鼠标操作        6:发送屏幕内容
-	// 7:锁机            8:解锁
-	// 9:删除文件        39:测试连接
-	// 返回值：命令， -1错误
-	int SendCommandPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t length = 0);
+	
 	CString GetPath(HTREEITEM hTree);
 	void DeleteTreeChildrenItem(HTREEITEM hTree);
 	void LoadFileInfo();
 	void LaodFileCurrent();
-	static void threadEntryForDownFile(void* arg);   //TODO:这里为什么是static
+	//static void threadEntryForDownFile(void* arg);   //TODO:这里为什么是static
 											   //线程入口函数必须是一个普通函数
 											   //非静态成员函数，它会默认带有一个隐藏的 this 指针
 											   //使成员函数无法直接作为线程入口函数使用，因为不符合预期的函数原型
 											   //还可以限定该函数的作用域,避免不必要的外部访问
-	void threadDownFile();
-	static void threadEntryForWatchData(void* arg);  //静态函数不能用this指针
-	void threadWatchFile();
+	//void threadDownFile();
+	//static void threadEntryForWatchData(void* arg);  //静态函数不能用this指针
+	//void threadWatchData();
 
 private:
 	CImage mImage;  //作图像缓存
@@ -83,4 +77,6 @@ public:
 	afx_msg void OnRunFile();
 	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);  //定义自定义消息响应函数②
 	afx_msg void OnBnClickedBtnStartWatch();
+	afx_msg void OnIpnFieldchangedIpaddress2Serv(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnEnChangeEdit1Port();
 };

@@ -190,6 +190,7 @@
     <ClInclude Include="pch.h" />
     <ClInclude Include="RemoteClient.h" />
     <ClInclude Include="RemoteClientDlg.h" />
+    <ClInclude Include="RemoteTool.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="StatusDlg.h" />
     <ClInclude Include="targetver.h" />

@@ -85,7 +85,7 @@ public:
 	int Size()  {
 		return nLength + 6;
 	}
-	const char* Data() {    //返回完整数据
+	const char* Data(std::string& strOut) const{    //返回完整数据
 		strOut.resize(nLength + 6);
 		BYTE* pData = (BYTE*)strOut.c_str();
 		*(WORD*)pData = sHead; pData += 2;
@@ -102,7 +102,7 @@ public:
 	WORD sCmd;  //控制命令
 	std::string strData;   //包数据 
 	WORD sSum; //和校验(校验包数据的和)
-	std::string strOut; //整个包的数据
+	//std::string strOut; //整个包的数据
 };
 #pragma pack(pop)
 
@@ -143,16 +143,16 @@ public:
 		if (!mInstance) mInstance = new CClientSocket();
 		return mInstance;
 	}
-	bool InitSocket(int nIP, int nPort) {
+	bool InitSocket() {
 		if (mSock != INVALID_SOCKET) CloseSocket();
 		mSock = socket(PF_INET, SOCK_STREAM, 0);
 		if (mSock == -1) return false;
 		sockaddr_in servAddr;
 		memset(&servAddr, 0, sizeof(servAddr));
 		servAddr.sin_family = AF_INET;
-		TRACE("addr: %08x nIP: %08x\r\n", inet_addr("127.0.0.1"), nIP);
-		servAddr.sin_port = htons(nPort);
-		servAddr.sin_addr.s_addr = htonl(nIP);
+		TRACE("addr: %08x nIP: %08x\r\n", inet_addr("127.0.0.1"), mnIP);
+		servAddr.sin_port = htons(mnPort);
+		servAddr.sin_addr.s_addr = htonl(mnIP);
 		if (servAddr.sin_addr.s_addr == INADDR_NONE) {
 			AfxMessageBox(_T("指定IP不存在!"));
 			return false;
@@ -194,10 +194,12 @@ public:
 		if (mSock == -1) return false;
 		return send(mSock, pData, nSize, 0) > 0;
 	}
-	bool Send(CPacket& pack) {
+	bool Send(const CPacket& pack) {
 		TRACE("mSock = %d\r\n", mSock);
 		if (mSock == -1) return false;
-		return send(mSock, pack.Data(), pack.Size(), 0) > 0;
+		std::string strOut;
+		pack.Data(strOut);
+		return send(mSock, strOut.c_str(), strOut.size(), 0) > 0;
 	}
 	bool GetFilePath(std::string& strPath)const {
 		if (mPacket.sCmd >= 2 && mPacket.sCmd <= 4) {
@@ -220,7 +222,13 @@ public:
 		closesocket(mSock);
 		mSock = INVALID_SOCKET;
 	}
+	void UpdataAddress(int nIP, int nPort) {
+		mnIP = nIP;
+		mnPort = nPort;
+	}
 private:
+	int mnIP;
+	int mnPort;
 	std::vector<char> mBuffer;
 	SOCKET mSock;
 	CPacket mPacket;
@@ -228,8 +236,10 @@ private:
 	CClientSocket& operator=(const CClientSocket& ss) {}
 	CClientSocket(const CClientSocket& ss) {
 		mSock = ss.mSock;
+		mnIP = ss.mnIP;
+		mnPort = ss.mnPort;
 	}
-	CClientSocket() {
+	CClientSocket() : mnIP(INADDR_ANY), mnPort(0) {
 		if (!InitSockEnv()) {
 			MessageBox(NULL, _T("无法初始化套接字环境，请检查网络设置"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
 			exit(0);
