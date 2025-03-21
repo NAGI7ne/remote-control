@@ -4,8 +4,9 @@
 
 std::map<UINT, CClientController::MSGFUNC> CClientController::mMapFunc;
 CClientController* CClientController::mInstance = NULL;
+CClientController::CHelper CClientController::mHelper;
 
-CClientController* CClientController::getInstance()  //为什么在这里构造
+CClientController* CClientController::getInstance()
 {
 	if (mInstance == NULL) {
 		mInstance = new CClientController();
@@ -57,14 +58,50 @@ LRESULT CClientController::SendMessage(MSG msg)
 	return info.result;
 }
 
+int CClientController::SendCommandPacket(int nCmd, bool bAutoClose, BYTE* pData, size_t length)
+{
+	CClientSocket* pClient = CClientSocket::getInstance();
+	if (pClient->InitSocket() == false) return false;
+	pClient->Send(CPacket(nCmd, pData, length));
+	int cmd = DealCommand();  //发送包后进入收包状态
+	TRACE("ack: %d\r\n", cmd);
+	if (bAutoClose) CloseSocket();
+	return cmd;
+}
+
+int CClientController::DownFile(CString strPath)
+{
+	//创建一个“保存文件”对话框
+		//（第一个参数为 FALSE 表示保存文件，若为 TRUE 则为打开文件）。
+		//NULL：不指定缺省的扩展名
+		//OFN_HIDEREADONLY 隐藏只读复选框 OFN_OVERWRITEPROMPT 如果文件已存在
+		// 则提示用户是否覆盖
+	CFileDialog dlg(FALSE, NULL, strPath,
+		OFN_HIDEREADONLY | OFN_OVERWRITEPROMPT, NULL, &mRemoteDlg);
+	if (dlg.DoModal() == IDOK) {
+		mstrRemote = strPath;
+		mstrLocal = dlg.GetPathName();
+		mhThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
+		if (WaitForSingleObject(mhThreadDownload, 0) != WAIT_TIMEOUT) {
+			return -1;
+		}
+		mRemoteDlg.BeginWaitCursor();  //设置鼠标为等待状态 
+		mStatusDlg.mDlgStatusInfo.SetWindowText(_T("下载中..."));
+		mStatusDlg.ShowWindow(SW_SHOW);
+		mStatusDlg.CenterWindow(&mRemoteDlg);
+		mStatusDlg.SetActiveWindow(); //  激活至前台
+	}
+	return 0;
+}
+
 void CClientController::StartWatchScreen()
 {
 	mIsClosed = false;
-	CWatchDialog dlg(&mRemoteDlg);
+	mWatchDlg.SetParent(&mRemoteDlg);
 	//_beginthread 返回的是线程 ID 而非真正的内核句柄
 	// 最好使用 _beginthreadex
 	mhThreadWatch = (HANDLE)_beginthread(&CClientController::threadWatchScreenEntry, 0, this);
-	dlg.DoModal();  //启动对话框的模态循环，模态对话框会阻塞当前线程的其他操作，直到用户关闭对话框。
+	mWatchDlg.DoModal();  //启动对话框的模态循环，模态对话框会阻塞当前线程的其他操作，直到用户关闭对话框。
 	mIsClosed = true;
 	WaitForSingleObject(mhThreadWatch, 500);    //等待后台线程在最多 500 毫秒内结束运行，会阻塞当前线程 直到后台线程退出或超时
 	//线程函数内部虽然调用了 _endthread()，线程的实际终止过程也依赖于操作系统的调度。
@@ -76,11 +113,11 @@ void CClientController::threadWatchScreen()
 	Sleep(50);   //确保晚于dlg.DoModal();窗口启动
 	CClientController* pController = CClientController::getInstance();
 	while (!mIsClosed) {
-		if (mRemoteDlg.isFull() == false) {   //更新数据到缓存
+		if (mWatchDlg.isFull() == false) {   //更新数据到缓存
 			int ret = SendCommandPacket(6);
 			if (ret == 6) {
 				if (GetImage(mRemoteDlg.GetImage()) == 0) {
-					mRemoteDlg.SetImageStatus(true);
+					mWatchDlg.SetImageStatus(true);
 				}
 				else {
 					TRACE("获取图片失败! ret = %d\r\n", ret);

@@ -6,7 +6,7 @@
 #include "ClientSocket.h"
 #include "StatusDlg.h"
 
-#define WM_SEND_PACKET (WM_USER+1) //(发送数据包消息①)
+//#define WM_SEND_PACKET (WM_USER+1) //(发送数据包消息①)
 								   //通过发送和接收消息进行内部通信
 								   // 从 WM_USER 开始，Windows 预留了一段消息编号（通常定义为 0x0400）
 								   // 给开发者用来定义自己的自定义消息，避免和系统的标准消息冲突
@@ -43,12 +43,9 @@ private:
 
 private:
 	CImage mImage;  //作图像缓存
-	bool mImageIsFull;  //缓存是否有数据
 	bool mIsThreadClosed;  //监视线程是否关闭
 public:
-	bool isFull() const { return mImageIsFull; }
 	CImage& GetImage() { return mImage; }
-	void SetImageStatus(bool isFull = false) { mImageIsFull = isFull; }
 
 // 实现
 protected:
@@ -75,7 +72,7 @@ public:
 	afx_msg void OnDownloadFile();
 	afx_msg void OnDeleteFile();
 	afx_msg void OnRunFile();
-	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);  //定义自定义消息响应函数②
+	//afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);  //定义自定义消息响应函数②
 	afx_msg void OnBnClickedBtnStartWatch();
 	afx_msg void OnIpnFieldchangedIpaddress2Serv(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnEnChangeEdit1Port();

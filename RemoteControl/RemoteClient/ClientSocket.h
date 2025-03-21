@@ -168,7 +168,7 @@ public:
 #define BUFFER_SIZE 2048000
 	int DealCommand() {
 		if (mSock == -1) return false;
-		char* buffer = mBuffer.data();
+		char* buffer = mBuffer.data();  //多线程发送命令可能会出现冲突
 		//memset(buffer, 0, BUFFER_SIZE);
 
 		// index记录当前缓冲区中累计的有效数据长度
@@ -177,7 +177,7 @@ public:
 		while (1) {
 			size_t len = recv(mSock, buffer + index, BUFFER_SIZE - index, 0);
 			if (len <= 0 && (index <= 0)) return -1;  //如果没接收到数据并且缓冲区没有数据
-			TRACE("client rev : %d\r\n", len);
+			TRACE("rev len = %d(0x%08X) index = %d(0x%08X)\r\n", len, len, index, index);
 			index += len;
 			len = index;
 			mPacket = CPacket((BYTE*)buffer, len);

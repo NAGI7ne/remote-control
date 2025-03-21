@@ -161,7 +161,7 @@ BEGIN_MESSAGE_MAP(CRemoteClientDlg, CDialogEx)
 	ON_COMMAND(ID_DOWNLOAD_FILE, &CRemoteClientDlg::OnDownloadFile)
 	ON_COMMAND(ID_DELETE_FILE, &CRemoteClientDlg::OnDeleteFile)
 	ON_COMMAND(ID_RUN_FILE, &CRemoteClientDlg::OnRunFile)
-	ON_MESSAGE(WM_SEND_PACKET, &CRemoteClientDlg::OnSendPacket)   //注册消息 ③
+	//ON_MESSAGE(WM_SEND_PACKET, &CRemoteClientDlg::OnSendPacket)   //注册消息 ③
 	ON_BN_CLICKED(IDC_BTN_START_WATCH, &CRemoteClientDlg::OnBnClickedBtnStartWatch)
 	ON_NOTIFY(IPN_FIELDCHANGED, IDC_IPADDRESS2_SERV, &CRemoteClientDlg::OnIpnFieldchangedIpaddress2Serv)
 	ON_EN_CHANGE(IDC_EDIT1_PORT, &CRemoteClientDlg::OnEnChangeEdit1Port)
@@ -209,7 +209,6 @@ BOOL CRemoteClientDlg::OnInitDialog()
 	UpdateData(FALSE);   //FALSE 时,UpdateData 则会把成员变量的值更新到对话框控件上（通常用于在对话框初始化时显示默认值）。
 	mDlgStatus.Create(IDD_DLG_STATUS, this);  
 	mDlgStatus.ShowWindow(SW_HIDE);
-	mImageIsFull = false;
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -376,42 +375,6 @@ void CRemoteClientDlg::OnRunFile()
 		AfxMessageBox("打开文件失败");
 	}
 }
-
-LRESULT CRemoteClientDlg::OnSendPacket(WPARAM wParam, LPARAM lParam)   //实现消息函数④
-{
-	 
-	int ret = 0;
-	int cmd = wParam >> 1;// eg: 收到的wParam是11 1011 右移一位：0101（5） 到case 5
-	switch (cmd)
-	{
-	case 4:
-		{
-			CString strFile = (LPCTSTR)lParam;
-			int ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1,
-				(BYTE*)(LPCTSTR)strFile, strFile.GetLength());
-		}
-		break;
-	case 5:
-		{
-			ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1, 
-				(BYTE*)lParam, sizeof(MOUSEEV));  // 1011 & 1 = 1， 设置为true
-		}
-		break;
-	case 6:
-	case 7:
-	case 8:   
-		{
-			ret = CClientController::getInstance()->SendCommandPacket(cmd, wParam & 1);
-		}
-		break;
-	default:
-		ret = -1;
-		//break;
-	}
-	
-	return  ret;
-}
-
 
 void CRemoteClientDlg::OnBnClickedBtnStartWatch()
 {
