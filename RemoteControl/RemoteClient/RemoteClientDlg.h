@@ -42,10 +42,8 @@ private:
 	//void threadWatchData();
 
 private:
-	CImage mImage;  //作图像缓存
 	bool mIsThreadClosed;  //监视线程是否关闭
 public:
-	CImage& GetImage() { return mImage; }
 
 // 实现
 protected:

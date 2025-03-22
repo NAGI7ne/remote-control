@@ -80,16 +80,15 @@ void CWatchDialog::OnTimer(UINT_PTR nIDEvent)
 		if (mImageIsFull) {
 			CRect rect;
 			mPicture.GetWindowRect(rect);
-			CImage image;
-			pParent->GetImage(image);
-			if (m_nObjWidth == -1) m_nObjWidth = image.GetWidth();
-			if (m_nObjHeight == -1) m_nObjHeight = image.GetHeight();
+			m_nObjWidth = mImage.GetWidth();
+			m_nObjHeight = mImage.GetHeight();
 			//将图像缩放
-			image.StretchBlt(mPicture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(),SRCCOPY);
+			mImage.StretchBlt(mPicture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(),SRCCOPY);
 			mPicture.InvalidateRect(NULL);  //将整个 mPicture 区域标记为“无效”，通知 Windows 系统需要重绘该控件
 											//系统会在空闲时触发 WM_PAINT 消息，调用控件的重绘函数
 											// 使刚刚绘制好的图像显示出来
-			image.Destroy();  //释放图像所占用的资源
+			TRACE("更新图片完成%d %d %08X\r\n", m_nObjWidth, m_nObjHeight, (HBITMAP)mImage);
+			mImage.Destroy();  //释放图像所占用的资源
 			//image.SetImageStatus();
 			mImageIsFull = false;
 		}

@@ -4,6 +4,9 @@
 #include "framework.h"
 #include <string>
 #include <vector>
+#include <list>
+#include <map>
+#include <mutex>
 
 #pragma pack(push) 
 #pragma pack(1)
@@ -16,8 +19,9 @@ public:
 		sCmd = pack.sCmd;
 		strData = pack.strData;
 		sSum = pack.sSum;
+		hEvent = pack.hEvent;
 	}
-	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {  //封装包
+	CPacket(WORD nCmd, const BYTE* pData, size_t nSize, HANDLE hEvent) {  //封装包
 		sHead = 0xFEFF;
 		nLength = nSize + 2 + 2;
 		sCmd = nCmd;
@@ -32,8 +36,11 @@ public:
 		for (size_t j = 0; j < nSize; j++) {
 			sSum += pData[j] & 0xFF;
 		}
+		this->hEvent = hEvent;
 	}
-	CPacket(const BYTE* pData, size_t& nSize) {    //解包
+	CPacket(const BYTE* pData, size_t& nSize)
+		: hEvent(INVALID_HANDLE_VALUE)
+	{    //解包
 		size_t i = 0;
 		for (i; i < nSize; i++) {
 			if (*(WORD*)(pData + i) == 0xFEFF) {   //包头存在 
@@ -79,6 +86,7 @@ public:
 			sCmd = pack.sCmd;
 			strData = pack.strData;
 			sSum = pack.sSum;
+			hEvent = pack.hEvent;
 		}
 		return *this;
 	}
@@ -102,7 +110,7 @@ public:
 	WORD sCmd;  //控制命令
 	std::string strData;   //包数据 
 	WORD sSum; //和校验(校验包数据的和)
-	//std::string strOut; //整个包的数据
+	HANDLE hEvent;
 };
 #pragma pack(pop)
 
@@ -132,7 +140,6 @@ typedef struct MouseEvent {
 }MOUSEEV, * PMOUSEEV;
 
 std::string GetErrorInfo(int wsaErrCode);
-void Dump(BYTE* pData, size_t nSize);
 //采用单例设计模式
 class CClientSocket
 {
@@ -143,28 +150,7 @@ public:
 		if (!mInstance) mInstance = new CClientSocket();
 		return mInstance;
 	}
-	bool InitSocket() {
-		if (mSock != INVALID_SOCKET) CloseSocket();
-		mSock = socket(PF_INET, SOCK_STREAM, 0);
-		if (mSock == -1) return false;
-		sockaddr_in servAddr;
-		memset(&servAddr, 0, sizeof(servAddr));
-		servAddr.sin_family = AF_INET;
-		TRACE("addr: %08x nIP: %08x\r\n", inet_addr("127.0.0.1"), mnIP);
-		servAddr.sin_port = htons(mnPort);
-		servAddr.sin_addr.s_addr = htonl(mnIP);
-		if (servAddr.sin_addr.s_addr == INADDR_NONE) {
-			AfxMessageBox(_T("指定IP不存在!"));
-			return false;
-		}
-		int ret = connect(mSock, (sockaddr*)&servAddr, sizeof(servAddr));
-		if (ret == -1) {
-			AfxMessageBox(_T("连接失败!"));
-			TRACE("连接失败: %d %s\r\n", WSAGetLastError(), GetErrorInfo(WSAGetLastError()).c_str());
-			return false;
-		}
-		return true;
-	}
+	bool InitSocket();
 #define BUFFER_SIZE 2048000
 	int DealCommand() {
 		if (mSock == -1) return false;
@@ -180,6 +166,7 @@ public:
 			TRACE("rev len = %d(0x%08X) index = %d(0x%08X)\r\n", len, len, index, index);
 			index += len;
 			len = index;
+			TRACE("rev len = %d(0x%08X) index = %d(0x%08X)\r\n", len, len, index, index);
 			mPacket = CPacket((BYTE*)buffer, len);
 			//TRACE("客户端解包成功 cmd: %d\r\n", mPacket.sCmd);
 			if (len > 0) {
@@ -190,17 +177,7 @@ public:
 		}
 		return -1;
 	}
-	bool Send(const char* pData, int nSize) {
-		if (mSock == -1) return false;
-		return send(mSock, pData, nSize, 0) > 0;
-	}
-	bool Send(const CPacket& pack) {
-		TRACE("mSock = %d\r\n", mSock);
-		if (mSock == -1) return false;
-		std::string strOut;
-		pack.Data(strOut);
-		return send(mSock, strOut.c_str(), strOut.size(), 0) > 0;
-	}
+	bool SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks, bool isAutoClosed = true);
 	bool GetFilePath(std::string& strPath)const {
 		if (mPacket.sCmd >= 2 && mPacket.sCmd <= 4) {
 			strPath = mPacket.strData;
@@ -223,10 +200,20 @@ public:
 		mSock = INVALID_SOCKET;
 	}
 	void UpdataAddress(int nIP, int nPort) {
-		mnIP = nIP;
-		mnPort = nPort;
+		if ((mnIP != nIP) || (mnPort != nPort)) {
+			mnIP = nIP;
+			mnPort = nPort;
+		}
 	}
 private:
+	HANDLE mhThread;
+	bool mbAutoClose;
+	std::mutex mLock;
+	std::list<CPacket> mlstSend;
+	////存储对应命令的一系列包
+	//在收包不确定的情况下，效率比vector高
+	std::map<HANDLE, std::list<CPacket>&> mMapAck; 
+	std::map<HANDLE, bool>mMapAutoClosed;
 	int mnIP;
 	int mnPort;
 	std::vector<char> mBuffer;
@@ -235,11 +222,13 @@ private:
 	// 禁用拷贝构造
 	CClientSocket& operator=(const CClientSocket& ss) {}
 	CClientSocket(const CClientSocket& ss) {
+		mbAutoClose = ss.mbAutoClose;
 		mSock = ss.mSock;
 		mnIP = ss.mnIP;
 		mnPort = ss.mnPort;
 	}
-	CClientSocket() : mnIP(INADDR_ANY), mnPort(0) {
+	CClientSocket() : mnIP(INADDR_ANY), mnPort(0), 
+		mSock(INVALID_SOCKET), mbAutoClose(true), mhThread(INVALID_HANDLE_VALUE){
 		if (!InitSockEnv()) {
 			MessageBox(NULL, _T("无法初始化套接字环境，请检查网络设置"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
 			exit(0);
@@ -249,8 +238,11 @@ private:
 	}
 	~CClientSocket() {
 		closesocket(mSock);
+		mSock = INVALID_SOCKET;
 		WSACleanup();
 	}
+	static void threadEntry(void* arg);
+	void threadFunc();
 	BOOL InitSockEnv() {
 		WSADATA data;
 		if (WSAStartup(MAKEWORD(1, 1), &data) != 0) {
@@ -267,6 +259,12 @@ private:
 			delete tmp;
 		}
 	}
+	bool Send(const char* pData, int nSize) {
+		if (mSock == -1) return false;
+		return send(mSock, pData, nSize, 0) > 0;
+	}
+	bool Send(const CPacket& pack);
+
 	//在main开始前初始化实例
 	static CClientSocket* mInstance;
 	//防止类没有被析构，原因mInstance没有delete，加一个类来间接删除mInstance

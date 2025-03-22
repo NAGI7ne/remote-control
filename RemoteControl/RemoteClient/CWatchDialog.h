@@ -19,7 +19,7 @@ public:
 public:
 	int m_nObjWidth;
 	int m_nObjHeight;
-
+	CImage mImage;  //作图像缓存
 protected:
 	bool mImageIsFull;  //缓存是否有数据
 
@@ -28,6 +28,7 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
+	CImage& GetImage() { return mImage; }
 	void SetImageStatus(bool isFull = false) { mImageIsFull = isFull; }
 	bool isFull() const { return mImageIsFull; }
 	CPoint UserPoint2RemotePoint(CPoint& point, bool isScreen = false);
