@@ -43,12 +43,15 @@ public:
 		int nCmd, 
 		bool bAutoClose = true,
 		BYTE* pData = NULL,
-		size_t length = 0);
+		size_t length = 0,
+		WPARAM wParam = 0);
 	
 	int GetImage(CImage& image) {
 		CClientSocket* pClient = CClientSocket::getInstance();
 		return CRemoteTool::Bytr2Image(image, pClient->GetPacket().strData);
 	}
+
+	void DownloadEnd();
 
 	int DownFile(CString strPath);
 

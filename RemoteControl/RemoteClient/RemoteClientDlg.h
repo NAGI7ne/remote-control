@@ -5,6 +5,9 @@
 #pragma once
 #include "ClientSocket.h"
 #include "StatusDlg.h"
+#ifndef WM_SEND_PACK_ACK
+#define WM_SEND_PACK_ACK (WM_USER + 2) //发送包数据应答
+#endif // !WM_SEND_PACK_ACK
 
 //#define WM_SEND_PACKET (WM_USER+1) //(发送数据包消息①)
 								   //通过发送和接收消息进行内部通信
@@ -74,4 +77,5 @@ public:
 	afx_msg void OnBnClickedBtnStartWatch();
 	afx_msg void OnIpnFieldchangedIpaddress2Serv(NMHDR* pNMHDR, LRESULT* pResult);
 	afx_msg void OnEnChangeEdit1Port();
+	afx_msg LRESULT OnSendPackAck(WPARAM wParam, LPARAM lParam);
 };

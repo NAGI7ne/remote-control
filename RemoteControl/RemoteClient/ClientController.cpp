@@ -59,11 +59,19 @@ LRESULT CClientController::SendMessage(MSG msg)
 	return info.result;
 }
 
-bool CClientController::SendCommandPacket(HWND hWnd, int nCmd, bool bAutoClose, BYTE* pData, size_t length)
+bool CClientController::SendCommandPacket(HWND hWnd, int nCmd, bool bAutoClose, BYTE* pData, 
+		size_t length, WPARAM wParam)
 {
 	TRACE("%s start %lld \r\n", __FUNCTION__, GetTickCount64());
 	CClientSocket* pClient = CClientSocket::getInstance();
-	return pClient->SendPacket(hWnd, CPacket(nCmd, pData, length), bAutoClose);
+	return pClient->SendPacket(hWnd, CPacket(nCmd, pData, length), bAutoClose, wParam);
+}
+
+void CClientController::DownloadEnd()
+{
+	mStatusDlg.ShowWindow(SW_HIDE);
+	mRemoteDlg.EndWaitCursor();
+	mRemoteDlg.MessageBox(_T("下载完成!"), _T("完成"));
 }
 
 int CClientController::DownFile(CString strPath)
@@ -78,10 +86,17 @@ int CClientController::DownFile(CString strPath)
 	if (dlg.DoModal() == IDOK) {
 		mstrRemote = strPath;
 		mstrLocal = dlg.GetPathName();
-		mhThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
-		if (WaitForSingleObject(mhThreadDownload, 0) != WAIT_TIMEOUT) {
+		//二进制写入模式打开（或创建）文件 
+		FILE* pFile = fopen(mstrLocal, "wb+");
+		if (pFile == NULL) {
+			AfxMessageBox("文件无法创建!");
 			return -1;
 		}
+		SendCommandPacket(mRemoteDlg, 4, false, (BYTE*)(LPCTSTR)mstrRemote, mstrRemote.GetLength(), (WPARAM)pFile);
+		/*mhThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
+		if (WaitForSingleObject(mhThreadDownload, 0) != WAIT_TIMEOUT) {
+			return -1;
+		}*/
 		mRemoteDlg.BeginWaitCursor();  //设置鼠标为等待状态 
 		mStatusDlg.mDlgStatusInfo.SetWindowText(_T("下载中..."));
 		mStatusDlg.ShowWindow(SW_SHOW);
@@ -151,7 +166,7 @@ void CClientController::threadDownloadFile()
 	}
 	CClientSocket* pClient = CClientSocket::getInstance();
 	do {
-		int ret = SendCommandPacket(mRemoteDlg, 4, false,(BYTE*)(LPCTSTR)mstrRemote, mstrRemote.GetLength());
+		int ret = SendCommandPacket(mRemoteDlg, 4, false,(BYTE*)(LPCTSTR)mstrRemote, mstrRemote.GetLength(), (WPARAM)pFile);
 		long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
 		TRACE("client rev fileLength: %d\r\n", nLength);
 		if (nLength == 0) {

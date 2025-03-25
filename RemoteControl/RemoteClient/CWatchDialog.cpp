@@ -43,6 +43,7 @@ BEGIN_MESSAGE_MAP(CWatchDialog, CDialog)
 	ON_STN_CLICKED(IDC_WATCH, &CWatchDialog::OnStnClickedWatch)
 	ON_BN_CLICKED(IDC_BTN_LOCK, &CWatchDialog::OnBnClickedBtnLock)
 	ON_BN_CLICKED(IDC_BTN_UNLOCK, &CWatchDialog::OnBnClickedBtnUnlock)
+	ON_MESSAGE(WM_SEND_PACK_ACK, &CWatchDialog::OnSendPackAck)
 END_MESSAGE_MAP()
 
 
@@ -65,7 +66,7 @@ BOOL CWatchDialog::OnInitDialog()
 
 	// TODO:  在此添加额外的初始化
 	mImageIsFull = false;
-	SetTimer(0, 30, NULL);   //设置了一个 ID 为 0 的定时器，定时器周期为 30 毫秒
+	//SetTimer(0, 30, NULL);   //设置了一个 ID 为 0 的定时器，定时器周期为 30 毫秒
 							 //NULL 表示使用默认的消息回调方式
 							 //即定时器消息将通过窗口消息 WM_TIMER 传递给该对话框的 OnTimer 成员函数。
 							 //消息包含定时器的 ID:0
@@ -76,28 +77,71 @@ BOOL CWatchDialog::OnInitDialog()
 
 void CWatchDialog::OnTimer(UINT_PTR nIDEvent)   
 {
-	if (nIDEvent == 0) {  //收到ID为0的定时器的消息
-		CClientController* pParent = CClientController::getInstance();
-		if (mImageIsFull) {
-			CRect rect;
-			mPicture.GetWindowRect(rect);
-			m_nObjWidth = mImage.GetWidth();
-			m_nObjHeight = mImage.GetHeight();
-			//将图像缩放
-			mImage.StretchBlt(mPicture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(),SRCCOPY);
-			mPicture.InvalidateRect(NULL);  //将整个 mPicture 区域标记为“无效”，通知 Windows 系统需要重绘该控件
-											//系统会在空闲时触发 WM_PAINT 消息，调用控件的重绘函数
-											// 使刚刚绘制好的图像显示出来
-			TRACE("更新图片完成%d %d %08X\r\n", m_nObjWidth, m_nObjHeight, (HBITMAP)mImage);
-			mImage.Destroy();  //释放图像所占用的资源
-			//image.SetImageStatus();
-			mImageIsFull = false;
-		}
-	}
+	//if (nIDEvent == 0) {  //收到ID为0的定时器的消息
+	//	CClientController* pParent = CClientController::getInstance();
+	//	if (mImageIsFull) {
+	//		CRect rect;
+	//		mPicture.GetWindowRect(rect);
+	//		m_nObjWidth = mImage.GetWidth();
+	//		m_nObjHeight = mImage.GetHeight();
+	//		//将图像缩放
+	//		mImage.StretchBlt(mPicture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(),SRCCOPY);
+	//		mPicture.InvalidateRect(NULL);  //将整个 mPicture 区域标记为“无效”，通知 Windows 系统需要重绘该控件
+	//										//系统会在空闲时触发 WM_PAINT 消息，调用控件的重绘函数
+	//										// 使刚刚绘制好的图像显示出来
+	//		TRACE("更新图片完成%d %d %08X\r\n", m_nObjWidth, m_nObjHeight, (HBITMAP)mImage);
+	//		mImage.Destroy();  //释放图像所占用的资源
+	//		//image.SetImageStatus();
+	//		mImageIsFull = false;
+	//	}
+	//}
 	 
 	CDialog::OnTimer(nIDEvent);  //调用基类的 OnTimer 可以确保消息得到完整的默认处理
 }
 
+
+LRESULT CWatchDialog::OnSendPackAck(WPARAM wParam, LPARAM lParam)
+{
+	if (lParam == -1 || (lParam == -2)) {
+	//错误处理
+	}
+	else if (lParam == 1) {
+		//对方关闭套接字
+	}
+	else {
+		CPacket* pPacket = (CPacket*)wParam;
+		if (pPacket != NULL) {
+			switch (pPacket->sCmd) {
+			case 6:
+			{
+				if (mImageIsFull == true) {
+					CRemoteTool::Bytr2Image(mImage, pPacket->strData);
+					CRect rect;
+					mPicture.GetWindowRect(rect);
+					m_nObjWidth = mImage.GetWidth();
+					m_nObjHeight = mImage.GetHeight();
+					//将图像缩放
+					mImage.StretchBlt(mPicture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(), SRCCOPY);
+					mPicture.InvalidateRect(NULL);  //将整个 mPicture 区域标记为“无效”，通知 Windows 系统需要重绘该控件
+					//系统会在空闲时触发 WM_PAINT 消息，调用控件的重绘函数
+					// 使刚刚绘制好的图像显示出来
+					TRACE("更新图片完成%d %d %08X\r\n", m_nObjWidth, m_nObjHeight, (HBITMAP)mImage);
+					mImage.Destroy();  //释放图像所占用的资源
+					//image.SetImageStatus();
+					mImageIsFull = false;
+				}
+				break;
+			}
+			case 5:
+			case 7:
+			case 8:
+			default:
+				break;
+			}
+		}
+	}
+	return 0;
+}
 
 void CWatchDialog::OnLButtonDblClk(UINT nFlags, CPoint point)
 {

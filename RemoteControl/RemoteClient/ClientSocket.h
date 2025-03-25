@@ -132,19 +132,23 @@ enum {   //TODO
 typedef struct PacketData {
 	std::string strData;
 	UINT nMode;
-	PacketData(const char* pData, size_t nLen, UINT mode) {
+	WPARAM wParam;
+	PacketData(const char* pData, size_t nLen, UINT mode, WPARAM nParam = 0) {
 		strData.resize(nLen);
 		memcpy((char*)strData.c_str(), pData, nLen);
 		nMode = mode;
+		wParam = 0;
 	}
 	PacketData(const PacketData& data) {
 		strData = data.strData;
 		nMode = data.nMode;
+		wParam = data.wParam;
 	}
 	PacketData& operator=(const PacketData& data) {
 		if (this != &data) {
 			strData = data.strData;
 			nMode = data.nMode;
+			wParam = data.wParam;
 		}
 		return *this;
 	}
@@ -201,7 +205,7 @@ public:
 		return -1;
 	}
 	//bool SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks, bool isAutoClosed = true);
-	bool SendPacket(HWND hWnd, const CPacket& pack, bool isAutoClosed = true);
+	bool SendPacket(HWND hWnd, const CPacket& pack, bool isAutoClosed = true, WPARAM nParam = 0);
 
 	bool GetFilePath(std::string& strPath)const {
 		if (mPacket.sCmd >= 2 && mPacket.sCmd <= 4) {
