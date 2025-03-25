@@ -8,6 +8,9 @@
 #include <map>
 #include <mutex>
 
+#define WM_SEND_PACK (WM_USER + 1)  //发送数据包
+#define WM_SEND_PACK_ACK (WM_USER + 2) //发送包数据应答
+
 #pragma pack(push) 
 #pragma pack(1)
 class CPacket {
@@ -19,9 +22,8 @@ public:
 		sCmd = pack.sCmd;
 		strData = pack.strData;
 		sSum = pack.sSum;
-		hEvent = pack.hEvent;
 	}
-	CPacket(WORD nCmd, const BYTE* pData, size_t nSize, HANDLE hEvent) {  //封装包
+	CPacket(WORD nCmd, const BYTE* pData, size_t nSize) {  //封装包
 		sHead = 0xFEFF;
 		nLength = nSize + 2 + 2;
 		sCmd = nCmd;
@@ -36,10 +38,8 @@ public:
 		for (size_t j = 0; j < nSize; j++) {
 			sSum += pData[j] & 0xFF;
 		}
-		this->hEvent = hEvent;
 	}
 	CPacket(const BYTE* pData, size_t& nSize)
-		: hEvent(INVALID_HANDLE_VALUE)
 	{    //解包
 		size_t i = 0;
 		for (i; i < nSize; i++) {
@@ -86,7 +86,6 @@ public:
 			sCmd = pack.sCmd;
 			strData = pack.strData;
 			sSum = pack.sSum;
-			hEvent = pack.hEvent;
 		}
 		return *this;
 	}
@@ -110,7 +109,6 @@ public:
 	WORD sCmd;  //控制命令
 	std::string strData;   //包数据 
 	WORD sSum; //和校验(校验包数据的和)
-	HANDLE hEvent;
 };
 #pragma pack(pop)
 
@@ -126,6 +124,31 @@ typedef struct fileInfo {
 	BOOL HasNext; //是否还有后续
 	char szFileName[256];  //文件名
 }FILEINFO, * PFILEINFO;
+
+enum {   //TODO
+	CSM_AUTOCLOSE = 1, //CSM = Client Socket Mode 自动关闭
+};
+
+typedef struct PacketData {
+	std::string strData;
+	UINT nMode;
+	PacketData(const char* pData, size_t nLen, UINT mode) {
+		strData.resize(nLen);
+		memcpy((char*)strData.c_str(), pData, nLen);
+		nMode = mode;
+	}
+	PacketData(const PacketData& data) {
+		strData = data.strData;
+		nMode = data.nMode;
+	}
+	PacketData& operator=(const PacketData& data) {
+		if (this != &data) {
+			strData = data.strData;
+			nMode = data.nMode;
+		}
+		return *this;
+	}
+}PACKET_DATA;
 
 typedef struct MouseEvent {
 	MouseEvent() {
@@ -177,7 +200,9 @@ public:
 		}
 		return -1;
 	}
-	bool SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks, bool isAutoClosed = true);
+	//bool SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks, bool isAutoClosed = true);
+	bool SendPacket(HWND hWnd, const CPacket& pack, bool isAutoClosed = true);
+
 	bool GetFilePath(std::string& strPath)const {
 		if (mPacket.sCmd >= 2 && mPacket.sCmd <= 4) {
 			strPath = mPacket.strData;
@@ -206,6 +231,9 @@ public:
 		}
 	}
 private:
+	UINT mhThreadID;
+	typedef void(CClientSocket::* MSGFUNC)(UINT nMsg, WPARAM wParam, LPARAM lParam);
+	std::map<UINT, MSGFUNC> mMapFunc;
 	HANDLE mhThread;
 	bool mbAutoClose;
 	std::mutex mLock;
@@ -221,28 +249,16 @@ private:
 	CPacket mPacket;
 	// 禁用拷贝构造
 	CClientSocket& operator=(const CClientSocket& ss) {}
-	CClientSocket(const CClientSocket& ss) {
-		mbAutoClose = ss.mbAutoClose;
-		mSock = ss.mSock;
-		mnIP = ss.mnIP;
-		mnPort = ss.mnPort;
-	}
-	CClientSocket() : mnIP(INADDR_ANY), mnPort(0), 
-		mSock(INVALID_SOCKET), mbAutoClose(true), mhThread(INVALID_HANDLE_VALUE){
-		if (!InitSockEnv()) {
-			MessageBox(NULL, _T("无法初始化套接字环境，请检查网络设置"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
-			exit(0);
-		}
-		mBuffer.resize(BUFFER_SIZE);
-		memset(mBuffer.data(), 0, BUFFER_SIZE);
-	}
+	CClientSocket(const CClientSocket& ss);
+	CClientSocket();
 	~CClientSocket() {
 		closesocket(mSock);
 		mSock = INVALID_SOCKET;
 		WSACleanup();
 	}
-	static void threadEntry(void* arg);
-	void threadFunc();
+	static unsigned __stdcall threadEntry(void* arg);
+	//void threadFunc();
+	void threadFunc2();
 	BOOL InitSockEnv() {
 		WSADATA data;
 		if (WSAStartup(MAKEWORD(1, 1), &data) != 0) {
@@ -264,6 +280,7 @@ private:
 		return send(mSock, pData, nSize, 0) > 0;
 	}
 	bool Send(const CPacket& pack);
+	void SendPack(UINT nmsg, WPARAM wParam/*缓冲区的值*/, LPARAM lParam/*缓冲区的长度*/);
 
 	//在main开始前初始化实例
 	static CClientSocket* mInstance;

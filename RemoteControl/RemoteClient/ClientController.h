@@ -7,7 +7,6 @@
 #include "RemoteTool.h"
 #include <map>
 
-//#define WM_SEND_PACK (WM_USER + 1)  //发送数据包
 //#define WM_SEND_DATA (WM_USER + 2)  //发送数据
 #define WM_SHOW_STAUTS (WM_USER + 3 ) // 展示状态
 #define WM_SHOW_WATCH (WM_USER + 4) // 远程控制
@@ -39,12 +38,12 @@ public:
 	// 5:鼠标操作        6:发送屏幕内容
 	// 7:锁机            8:解锁
 	// 9:删除文件        39:测试连接
-	// 返回值：命令， -1错误
-	int SendCommandPacket(int nCmd,
+	// 返回值: trur, false
+	bool SendCommandPacket(HWND hWnd, //数据包收到后需要应答的窗口
+		int nCmd, 
 		bool bAutoClose = true,
 		BYTE* pData = NULL,
-		size_t length = 0,
-		std::list<CPacket>* plstPacks = NULL);
+		size_t length = 0);
 	
 	int GetImage(CImage& image) {
 		CClientSocket* pClient = CClientSocket::getInstance();
