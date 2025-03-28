@@ -22,7 +22,7 @@ public:
 	//启动
 	int Invoke(CWnd* pMainWnd);
 	//发送消息
-	LRESULT SendMessage(MSG msg);
+	//LRESULT SendMessage(MSG msg);
 	//更新网络服务器地址
 	void UpdataAddress(int nIP, int nPort) {
 		CClientSocket::getInstance()->UpdataAddress(nIP, nPort);
@@ -43,7 +43,7 @@ public:
 		int nCmd, 
 		bool bAutoClose = true,
 		BYTE* pData = NULL,
-		size_t length = 0,
+		size_t nLength = 0,
 		WPARAM wParam = 0);
 	
 	int GetImage(CImage& image) {
@@ -59,14 +59,11 @@ public:
 protected:
 	void threadWatchScreen();
 	static void threadWatchScreenEntry(void* arg);
-	void threadDownloadFile();
-	static void threadDownloadEntry(void* arg);
 	CClientController() : 
 		mStatusDlg(&mRemoteDlg),
 		mWatchDlg(&mRemoteDlg)
 	{
 		mhThread = INVALID_HANDLE_VALUE;
-		mhThreadDownload = INVALID_HANDLE_VALUE;
 		mhThreadWatch = INVALID_HANDLE_VALUE;
 		mnThreadID = -1;
 		mIsClosed = true;
@@ -108,11 +105,10 @@ private:
 	}MSGINFO;
 	typedef LRESULT(CClientController::* MSGFUNC)(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	static std::map<UINT, MSGFUNC> mMapFunc;  //头文件声明，还需要在cpp实现
-	CWatchDialog mWatchDlg;
+	CWatchDialog mWatchDlg;  ////消息包，在对话框关闭之后，可能导致内存泄漏
 	CRemoteClientDlg mRemoteDlg;
 	CStatusDlg mStatusDlg;
 	HANDLE mhThread;
-	HANDLE mhThreadDownload;
 	HANDLE mhThreadWatch;
 	bool mIsClosed;
 	// 下载文件的远程路径

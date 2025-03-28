@@ -28,13 +28,18 @@ public:
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
-
-private:
-	
-	CString GetPath(HTREEITEM hTree);
-	void DeleteTreeChildrenItem(HTREEITEM hTree);
+public:
 	void LoadFileInfo();
 	void LaodFileCurrent();
+private:
+	void DealCommand(WORD nCmd, const std::string& strData, LPARAM lParam);
+	void InitUIData();
+	void Str2Tree(const std::string& drivers, CTreeCtrl& tree);
+	void UpdateFileInfo(const FILEINFO& finfo, HTREEITEM hParent);
+	void UpdateDownloadFile(const std::string& strData, FILE* pFile);
+	CString GetPath(HTREEITEM hTree);
+	void DeleteTreeChildrenItem(HTREEITEM hTree);
+	//void LaodFileCurrent();
 	//static void threadEntryForDownFile(void* arg);   //TODO:这里为什么是static
 											   //线程入口函数必须是一个普通函数
 											   //非静态成员函数，它会默认带有一个隐藏的 this 指针

@@ -26,19 +26,19 @@ std::string GetErrorInfo(int wsaErrCode) {
 	return ret;
 }
 
-//void Dump(BYTE* pData, size_t nSize)
-//{
-//	std::string strOut;
-//	for (size_t i = 0; i < nSize; i++)
-//	{
-//		char buf[8] = "";
-//		if (i > 0 && (i % 16 == 0))strOut += "\n";
-//		snprintf(buf, sizeof(buf), "%02X ", pData[i] & 0xFF);
-//		strOut += buf;
-//	}
-//	strOut += "\n";
-//	OutputDebugStringA(strOut.c_str());
-//}
+void Dump(BYTE* pData, size_t nSize)
+{
+	std::string strOut;
+	for (size_t i = 0; i < nSize; i++)
+	{
+		char buf[8] = "";
+		if (i > 0 && (i % 16 == 0))strOut += "\n";
+		snprintf(buf, sizeof(buf), "%02X ", pData[i] & 0xFF);
+		strOut += buf;
+	}
+	strOut += "\n";
+	OutputDebugStringA(strOut.c_str());
+}
 
 CClientSocket::CClientSocket(const CClientSocket& ss) {
 	mhThread = INVALID_HANDLE_VALUE;
@@ -54,10 +54,16 @@ CClientSocket::CClientSocket(const CClientSocket& ss) {
 
 CClientSocket::CClientSocket() : mnIP(INADDR_ANY), mnPort(0),
 mSock(INVALID_SOCKET), mbAutoClose(true), mhThread(INVALID_HANDLE_VALUE) {
-	if (!InitSockEnv()) {
+	if (InitSockEnv() == FALSE) {
 		MessageBox(NULL, _T("无法初始化套接字环境，请检查网络设置"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
 		exit(0);
 	}
+	mEventInvoke = CreateEvent(NULL, TRUE, FALSE, NULL);
+	mhThread = (HANDLE)_beginthreadex(NULL, 0, &CClientSocket::threadEntry, this, 0, &mhThreadID);
+	if (WaitForSingleObject(mEventInvoke, 100) == WAIT_TIMEOUT) {
+		TRACE("线程启动失败!\r\n");
+	}
+	CloseHandle(mEventInvoke);
 	mBuffer.resize(BUFFER_SIZE);
 	memset(mBuffer.data(), 0, BUFFER_SIZE);
 	struct {
@@ -99,15 +105,15 @@ bool CClientSocket::InitSocket()
 }
 
 bool CClientSocket::SendPacket(HWND hWnd, const CPacket& pack, bool isAutoClosed, WPARAM wParam) {
-	if (mhThread == INVALID_HANDLE_VALUE) {
-		mhThread = (HANDLE)_beginthreadex(NULL, 0, &CClientSocket::threadEntry, this, 0, &mhThreadID);
-	}
 	UINT nMode = isAutoClosed ? CSM_AUTOCLOSE : 0;
 	std::string strOut;
 	pack.Data(strOut);
-	return PostThreadMessage(mhThreadID, WM_SEND_PACK, 
-		(WPARAM)new PACKET_DATA(strOut.c_str(), strOut.size(), nMode, wParam),
-		(LPARAM)hWnd);
+	PACKET_DATA* pData = new PACKET_DATA(strOut.c_str(), strOut.size(), nMode, wParam);
+	bool ret = PostThreadMessage(mhThreadID, WM_SEND_PACK, (WPARAM)pData, (LPARAM)hWnd);
+	if (ret == false) {
+		delete pData;
+	}
+	return ret;
 }
 
 //bool CClientSocket::SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks, bool isAutoClosed)
@@ -214,10 +220,12 @@ unsigned CClientSocket::threadEntry(void* arg)
 
 void CClientSocket::threadFunc2()
 {
+	SetEvent(mEventInvoke);
 	MSG msg;
 	while (::GetMessage(&msg, NULL, 0, 0)) {
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
+		TRACE("Get Message :%08X \r\n", msg.message);
 		if (mMapFunc.find(msg.message) != mMapFunc.end()) {
 			(this->*mMapFunc[msg.message])(msg.message, msg.wParam, msg.lParam);
 		}
@@ -233,15 +241,17 @@ bool CClientSocket::Send(const CPacket& pack)
 	return send(mSock, strOut.c_str(), strOut.size(), 0) > 0;
 }
 
-void CClientSocket::SendPack(UINT nmsg, WPARAM wParam, LPARAM lParam)
+void CClientSocket::SendPack(UINT nMsg, WPARAM wParam, LPARAM lParam)
 {
 	// 如果函数发送的是临时变量
-		// 在函数执行完成之后会被释放，有潜在的风险
-		// 所以在这里构造局部变量一个用于储存发送值的临时变量
-		// 并且将wParam释放，以防内存泄露的风险
+	// 在函数执行完成之后会被释放，有潜在的风险
+	// 所以在这里构造局部变量一个用于储存发送值的临时变量
+	// 并且将wParam释放，以防内存泄露的风险
 	PACKET_DATA data = *(PACKET_DATA*)wParam;
 	delete (PACKET_DATA*)wParam;
 	HWND hWnd = (HWND)lParam;
+	size_t nTemp = data.strData.size();
+	CPacket current((BYTE*)data.strData.c_str(), nTemp);
 	if (InitSocket() == true) {
 		int ret = send(mSock, (char*)data.strData.c_str(), (int)data.strData.size(), 0);
 		if (ret > 0) {
@@ -250,24 +260,27 @@ void CClientSocket::SendPack(UINT nmsg, WPARAM wParam, LPARAM lParam)
 			strBuffer.resize(BUFFER_SIZE);
 			char* pBuffer = (char*)strBuffer.c_str();
 			while (mSock != INVALID_SOCKET) {
-				int length = recv(mSock, pBuffer, BUFFER_SIZE - index, 0);
+				int length = recv(mSock, pBuffer + index, BUFFER_SIZE - index, 0);
 				if (length > 0 || index > 0) {
 					index += (size_t)length;
 					size_t nLen = index;
 					CPacket pack((BYTE*)pBuffer, nLen);
 					if(nLen > 0){
+						TRACE("ack pack %d to hWnd %08X %d %d\r\n", pack.sCmd, hWnd, index, nLen);
+						TRACE("%04X\r\n", *(WORD*)pBuffer + nLen);
 						::SendMessage(hWnd, WM_SEND_PACK_ACK, (WPARAM)new CPacket(pack), data.wParam);  //TODO:
 						if (data.nMode & CSM_AUTOCLOSE) {  //TODO:
 							CloseSocket();
 							return;
 						}
+						index -= nLen;
+						memmove(pBuffer, pBuffer + nLen, index);
 					}
-					index -= nLen;
-					memmove(pBuffer, pBuffer + index, nLen);
 				}
 				else {
+					TRACE("recv failed length %d index %d cmd %d\r\n", length, index, current.sCmd);
 					CloseSocket();
-					::SendMessage(hWnd, WM_SEND_PACK_ACK, NULL, 1);
+					::SendMessage(hWnd, WM_SEND_PACK_ACK, (WPARAM)new CPacket(current.sCmd, NULL, 0), 1);
 				}
 			}
 		}
@@ -277,6 +290,6 @@ void CClientSocket::SendPack(UINT nmsg, WPARAM wParam, LPARAM lParam)
 		}
 	}
 	else {
-		::SendMessage(hWnd, WM_SEND_PACK_ACK, NULL, -1);
+		::SendMessage(hWnd, WM_SEND_PACK_ACK, NULL, -2);
 	}
 }

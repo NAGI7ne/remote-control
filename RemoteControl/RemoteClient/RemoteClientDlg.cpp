@@ -69,6 +69,124 @@ void CRemoteClientDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_LIST1_FILE, mList);
 }
 
+void CRemoteClientDlg::DealCommand(WORD nCmd, const std::string& strData, LPARAM lParam)
+{
+	switch (nCmd) {
+	case 1://获取驱动信息
+		Str2Tree(strData, mTree);
+		break;
+	case 2://获取文件信息
+	{
+		UpdateFileInfo(*(PFILEINFO)strData.c_str(), (HTREEITEM)lParam);
+		break;
+	}
+	break;
+	case 3:
+		MessageBox("打开文件完成！", "操作完成", MB_ICONINFORMATION);
+		break;
+	case 4:
+		UpdateDownloadFile(strData, (FILE*)lParam);
+		break;
+	case 9:
+		MessageBox("删除文件完成！", "操作完成", MB_ICONINFORMATION);
+		break;
+	case 39:
+		MessageBox("连接测试成功！", "连接成功", MB_ICONINFORMATION);
+		break;
+	default:
+		TRACE("unknow data received! %d\r\n", nCmd);
+		break;
+	}
+}
+
+void CRemoteClientDlg::InitUIData()
+{
+	// 设置此对话框的图标。  当应用程序主窗口不是对话框时，框架将自动
+	//  执行此操作
+	SetIcon(m_hIcon, TRUE);			// 设置大图标
+	SetIcon(m_hIcon, FALSE);		// 设置小图标
+
+	UpdateData();  //从对话框上的控件（例如编辑框、复选框等）中提取当前的内容，并把这些数据写入关联的成员变量中。
+	mServAddr = 0xC0A8A084;  //192.168.160.132
+	//mServAddr = 0x7F000001;  //127.0.0.1
+	mNport = _T("9339");
+	CClientController* pController = CClientController::getInstance();
+	pController->UpdataAddress(mServAddr, atoi((LPCTSTR)mNport));
+	UpdateData(FALSE);   //FALSE 时,UpdateData 则会把成员变量的值更新到对话框控件上（通常用于在对话框初始化时显示默认值）。
+	mDlgStatus.Create(IDD_DLG_STATUS, this);
+	mDlgStatus.ShowWindow(SW_HIDE);
+}
+
+void CRemoteClientDlg::Str2Tree(const std::string& drivers, CTreeCtrl& tree)
+{
+	std::string dr;
+	tree.DeleteAllItems();
+	for (size_t i = 0; i < drivers.size(); i++)
+	{
+		if (drivers[i] == ',') {
+			dr += ":";
+			HTREEITEM hTemp = tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
+			mTree.InsertItem(NULL, hTemp, TVI_LAST);
+			dr.clear();
+			continue;
+		}
+		dr += drivers[i];
+	}
+	if (dr.size() > 0) {
+		dr += ":";
+		HTREEITEM hTemp = tree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);
+		tree.InsertItem(NULL, hTemp, TVI_LAST);
+	}
+}
+
+void CRemoteClientDlg::UpdateFileInfo(const FILEINFO& finfo, HTREEITEM hParent)
+{
+	TRACE("hasNext %d isdirectory %d %s \r\n", finfo.HasNext, finfo.IsDirectory, finfo.szFileName);
+	if (finfo.HasNext == FALSE) return;
+	if (finfo.IsDirectory) {    //处理"."和".."
+		if ((CString)finfo.szFileName == "." || (CString)finfo.szFileName == "..") {
+			return;
+		}
+		TRACE("hselected %08X %08X\r\n", hParent, mTree.GetSelectedItem());
+		HTREEITEM hTemp = mTree.InsertItem(finfo.szFileName, hParent);
+		mTree.InsertItem("", hTemp, TVI_LAST);
+		mTree.Expand(hParent, TVE_EXPAND);
+	}
+	else {
+		mList.InsertItem(0, finfo.szFileName);  //0：列表的第 0 行（第一行）插入
+	}
+}
+
+void CRemoteClientDlg::UpdateDownloadFile(const std::string& strData, FILE* pFile)
+{
+	static LONGLONG length = 0, index = 0;
+	TRACE("length %d index %d\r\n", length, index);
+	if (length == 0) {
+		length = *(long long*)strData.c_str();
+		if (length == 0) {
+			AfxMessageBox("文件长度为零或者无法读取文件！！！");
+			CClientController::getInstance()->DownloadEnd();
+		}
+	}
+	else if (length > 0 && (index >= length)) {
+		fclose(pFile);
+		length = 0;
+		index = 0;
+		CClientController::getInstance()->DownloadEnd();
+	}
+	else {
+		fwrite(strData.c_str(), 1, strData.size(), pFile);
+		index += strData.size();
+		TRACE("index = %d\r\n", index);
+		if (index >= length) {
+			fclose(pFile);
+			length = 0;
+			index = 0;
+			CClientController::getInstance()->DownloadEnd();
+		}
+	}
+}
+
 CString CRemoteClientDlg::GetPath(HTREEITEM hTree)
 {
 	CString strRet, strTmp;
@@ -96,30 +214,11 @@ void CRemoteClientDlg::LoadFileInfo()
 	mTree.ScreenToClient(&ptMouse);
 	HTREEITEM hTreeSelected = mTree.HitTest(ptMouse, 0);
 	if (hTreeSelected == NULL) return;
-	if (mTree.GetChildItem(hTreeSelected) == NULL) return;
 	DeleteTreeChildrenItem(hTreeSelected);
 	mList.DeleteAllItems();
 	CString strPath = GetPath(hTreeSelected);
-	std::list<CPacket> lstPackets;
-	int nCmd = CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 
+	CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 
 		2, false, (BYTE*)(LPCTSTR)strPath, strPath.GetLength(), (WPARAM)hTreeSelected);
-	if (lstPackets.size() > 0) {
-		std::list<CPacket>::iterator it = lstPackets.begin();
-		for (; it != lstPackets.end(); it++) {
-			PFILEINFO pInfo = (PFILEINFO)(*it).strData.c_str();
-			if (pInfo->HasNext == FALSE) continue;
-			if (pInfo->IsDirectory) {    //处理"."和".."
-				if ((CString)pInfo->szFileName == "." || (CString)pInfo->szFileName == "..") {
-					continue;
-				}
-				HTREEITEM hTemp = mTree.InsertItem(pInfo->szFileName, hTreeSelected, TVI_LAST);
-				mTree.InsertItem("", hTemp, TVI_LAST);
-			}
-			else {
-				mList.InsertItem(0, pInfo->szFileName);  //0：列表的第 0 行（第一行）插入
-			}
-		}
-	}
 }
 
 void CRemoteClientDlg::LaodFileCurrent()
@@ -190,22 +289,8 @@ BOOL CRemoteClientDlg::OnInitDialog()
 			pSysMenu->AppendMenu(MF_STRING, IDM_ABOUTBOX, strAboutMenu);
 		}
 	}
-
-	// 设置此对话框的图标。  当应用程序主窗口不是对话框时，框架将自动
-	//  执行此操作
-	SetIcon(m_hIcon, TRUE);			// 设置大图标
-	SetIcon(m_hIcon, FALSE);		// 设置小图标
-
 	
-	UpdateData();  //从对话框上的控件（例如编辑框、复选框等）中提取当前的内容，并把这些数据写入关联的成员变量中。
-	mServAddr = 0xC0A8A084;  //192.168.160.132
-	//mServAddr = 0x7F000001;  //127.0.0.1
-	mNport = _T("9339");
-	CClientController* pController = CClientController::getInstance();
-	pController->UpdataAddress(mServAddr, atoi((LPCTSTR)mNport));
-	UpdateData(FALSE);   //FALSE 时,UpdateData 则会把成员变量的值更新到对话框控件上（通常用于在对话框初始化时显示默认值）。
-	mDlgStatus.Create(IDD_DLG_STATUS, this);  
-	mDlgStatus.ShowWindow(SW_HIDE);
+	InitUIData();
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
 
@@ -387,91 +472,17 @@ void CRemoteClientDlg::OnEnChangeEdit1Port()
 LRESULT CRemoteClientDlg::OnSendPackAck(WPARAM wParam, LPARAM lParam)
 {
 	if (lParam == -1 || (lParam == -2)) {
-		//错误处理
+		TRACE("socket is error %d\r\n", lParam);
 	}
 	else if (lParam == 1) {
 		//对方关闭套接字
+		TRACE("socket is closed!\r\n");
 	}
 	else {
-		CPacket* pPacket = (CPacket*)wParam;
-		if (pPacket != NULL) {
-			CPacket& head = *pPacket;
-			switch (pPacket->sCmd) {
-			case 1:  //获取驱动信息
-			{
-				std::string drivers = head.strData;
-				std::string dr;
-				mTree.DeleteAllItems();
-				HTREEITEM hTemp{};
-				for (int i = 0; i < drivers.size(); i++) {
-					if (drivers[i] == ',') {
-						dr += ':';
-						hTemp = mTree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);  //加入到根目录，追加形式
-						mTree.InsertItem("", hTemp, TVI_LAST);
-						dr.clear();
-						continue;
-					}
-					dr += drivers[i];
-				}
-				dr += ':';
-				hTemp = mTree.InsertItem(dr.c_str(), TVI_ROOT, TVI_LAST);  //加入到根目录，追加形式
-				mTree.InsertItem("", hTemp, TVI_LAST);
-				dr.clear();
-			}
-				break;
-			case 2:  //获取文件信息
-			{
-				PFILEINFO pInfo = (PFILEINFO)head.strData.c_str();
-				if (pInfo->HasNext == FALSE) break;
-				if (pInfo->IsDirectory) {    //处理"."和".."
-					if ((CString)pInfo->szFileName == "." || (CString)pInfo->szFileName == "..") {
-						break;
-					}
-					HTREEITEM hTemp = mTree.InsertItem(pInfo->szFileName, (HTREEITEM)lParam, TVI_LAST);
-					mTree.InsertItem("", hTemp, TVI_LAST);
-				}
-				else {
-					mList.InsertItem(0, pInfo->szFileName);  //0：列表的第 0 行（第一行）插入
-				}
-			}
-				break;
-			case 3:
-				TRACE("open file done!\r\n");
-				break;
-			case 4:
-			{
-				static LONGLONG length = 0, index = 0;
-				if (length == 0) {
-					length = *(long long*)head.strData.c_str();
-					if (length == 0) {
-						AfxMessageBox("无法读取文件!");
-						CClientController::getInstance()->DownloadEnd();
-						break;
-					}
-				}
-				else if (length > 0 && (index >= length)) { //下载完成
-					fclose((FILE*)lParam);
-					length = 0;
-					index = 0;
-					CClientController::getInstance()->DownloadEnd();
-
-				}
-				else {
-					FILE* pFile = (FILE*)lParam;
-					fwrite(head.strData.c_str(), 1, head.strData.size(), pFile);
-					index += head.strData.size();
-				}
-			}
-			case 9:
-				TRACE("delete file done!\r\n");
-				break;
-			case 39:
-				TRACE("test connection success!\r\n");
-				break;
-			default:
-				TRACE("unknow data received! %d\r\n", head.sCmd);
-				break;
-			}
+		if (wParam != NULL) {
+			CPacket head = *(CPacket*)wParam;
+			delete (CPacket*)wParam;
+			DealCommand(head.sCmd, head.strData, lParam);
 		}
 	}
 	return 0;

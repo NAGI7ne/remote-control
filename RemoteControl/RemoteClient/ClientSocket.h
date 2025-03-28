@@ -42,7 +42,7 @@ public:
 	CPacket(const BYTE* pData, size_t& nSize)
 	{    //解包
 		size_t i = 0;
-		for (i; i < nSize; i++) {
+		for (; i < nSize; i++) {
 			if (*(WORD*)(pData + i) == 0xFEFF) {   //包头存在 
 				sHead = *(WORD*)(pData + i);
 				i += 2;    //跳过包头
@@ -77,8 +77,8 @@ public:
 			return;
 		}
 		nSize = 0;
-		return;
 	}
+	~CPacket() {}
 	CPacket& operator=(const CPacket& pack) {
 		if (this != &pack) {
 			sHead = pack.sHead;
@@ -102,7 +102,6 @@ public:
 		*(WORD*)pData = sSum;
 		return strOut.c_str();
 	}
-	~CPacket() {}
 public:
 	WORD sHead; //包头 0xFEFF
 	DWORD nLength; //包长度 （控制命令到和校验）
@@ -137,7 +136,7 @@ typedef struct PacketData {
 		strData.resize(nLen);
 		memcpy((char*)strData.c_str(), pData, nLen);
 		nMode = mode;
-		wParam = 0;
+		wParam = nParam;
 	}
 	PacketData(const PacketData& data) {
 		strData = data.strData;
@@ -167,6 +166,7 @@ typedef struct MouseEvent {
 }MOUSEEV, * PMOUSEEV;
 
 std::string GetErrorInfo(int wsaErrCode);
+void Dump(BYTE* pData, size_t nSize);
 //采用单例设计模式
 class CClientSocket
 {
@@ -174,13 +174,16 @@ public:
 	//确保外部能够访问
 	//静态函数没有this指针，无法直接访问成员变量
 	static CClientSocket* getInstance() {
-		if (!mInstance) mInstance = new CClientSocket();
+		if (mInstance == NULL) {//静态函数没有this指针，所以无法直接访问成员变量
+			mInstance = new CClientSocket();
+			TRACE("CClientSocket size is %d\r\n", sizeof(*mInstance));
+		}
 		return mInstance;
 	}
 	bool InitSocket();
-#define BUFFER_SIZE 2048000
+#define BUFFER_SIZE 4096000
 	int DealCommand() {
-		if (mSock == -1) return false;
+		if (mSock == -1) return -1;
 		char* buffer = mBuffer.data();  //多线程发送命令可能会出现冲突
 		//memset(buffer, 0, BUFFER_SIZE);
 
@@ -205,7 +208,7 @@ public:
 		return -1;
 	}
 	//bool SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks, bool isAutoClosed = true);
-	bool SendPacket(HWND hWnd, const CPacket& pack, bool isAutoClosed = true, WPARAM nParam = 0);
+	bool SendPacket(HWND hWnd, const CPacket& pack, bool isAutoClosed = true, WPARAM wParam = 0);
 
 	bool GetFilePath(std::string& strPath)const {
 		if (mPacket.sCmd >= 2 && mPacket.sCmd <= 4) {
@@ -216,7 +219,7 @@ public:
 	}
 	bool GetMouseEvent(MOUSEEV& mouse) {
 		if (mPacket.sCmd == 5) {
-			memcpy(&mouse, mPacket.strData.c_str(), mPacket.strData.size());
+			memcpy(&mouse, mPacket.strData.c_str(), sizeof(MOUSEEV));
 			return true;
 		}
 		return false;
@@ -235,6 +238,7 @@ public:
 		}
 	}
 private:
+	HANDLE mEventInvoke; //启动事件
 	UINT mhThreadID;
 	typedef void(CClientSocket::* MSGFUNC)(UINT nMsg, WPARAM wParam, LPARAM lParam);
 	std::map<UINT, MSGFUNC> mMapFunc;
@@ -272,11 +276,13 @@ private:
 	}
 	//这里mInstance是静态变量，release需要操作这个变量所以是静态的函数
 	static void releaseInstance() {
+		TRACE("CClientSocket has been called!\r\n");
 		if (mInstance != NULL) {
 			CClientSocket* tmp = mInstance;
 			mInstance = NULL;
 			//delete时调用CClientSocket的析构函数
 			delete tmp;
+			TRACE("CClientSocket has released!\r\n");
 		}
 	}
 	bool Send(const char* pData, int nSize) {

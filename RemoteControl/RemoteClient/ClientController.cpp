@@ -42,29 +42,37 @@ int CClientController::Invoke(CWnd* pMainWnd)
 	return mRemoteDlg.DoModal();
 }
 
-LRESULT CClientController::SendMessage(MSG msg)
-{
-	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);  //TODO;
-	if(hEvent == NULL) return -2;
-	MSGINFO info(msg);
-	//PostThreadMessage 只是把消息放入目标线程的消息队列，
-	//本身不会复制或管理这些数据的内存。
-	//如果直接将局部变量的地址或临时构造的数据传递过去
-	//可能会遇到在消息处理时数据已经失效的问题。
-	//使用事件在发送消息后阻塞
-	// 就能保证消息的内容在整个跨线程通信过程中始终有效。
-	PostThreadMessage(mnThreadID, WM_SEND_MESSAGE, (WPARAM)&info, (LPARAM)&hEvent);
-	WaitForSingleObject(hEvent, INFINITE); 
-	CloseHandle(hEvent);
-	return info.result;
-}
+//LRESULT CClientController::SendMessage(MSG msg)
+//{
+//	HANDLE hEvent = CreateEvent(NULL, TRUE, FALSE, NULL);  //TODO;
+//	if(hEvent == NULL) return -2;
+//	MSGINFO info(msg);
+//	//PostThreadMessage 只是把消息放入目标线程的消息队列，
+//	//本身不会复制或管理这些数据的内存。
+//	//如果直接将局部变量的地址或临时构造的数据传递过去
+//	//可能会遇到在消息处理时数据已经失效的问题。
+//	//使用事件在发送消息后阻塞
+//	// 就能保证消息的内容在整个跨线程通信过程中始终有效。
+//	PostThreadMessage(mnThreadID, WM_SEND_MESSAGE, (WPARAM)&info, (LPARAM)&hEvent);
+//	WaitForSingleObject(hEvent, INFINITE); 
+//	CloseHandle(hEvent);
+//	return info.result;
+//}
 
 bool CClientController::SendCommandPacket(HWND hWnd, int nCmd, bool bAutoClose, BYTE* pData, 
-		size_t length, WPARAM wParam)
+		size_t nLength, WPARAM wParam)
 {
-	TRACE("%s start %lld \r\n", __FUNCTION__, GetTickCount64());
+	TRACE("cmd:%d %s\r\n", nCmd, __FUNCTION__);
 	CClientSocket* pClient = CClientSocket::getInstance();
-	return pClient->SendPacket(hWnd, CPacket(nCmd, pData, length), bAutoClose, wParam);
+	bool ret =  pClient->SendPacket(hWnd, CPacket(nCmd, pData, nLength), bAutoClose, wParam);
+	//if (!ret) {  // 如果涉及的命令需要创建线程，那么在创建线程时，线程不会立刻执行
+	//			 // 所以之后的PostThreadMessage可能会失败
+	//			 // 所以需要等待线程启动再重新发送
+	//			 // 可以用事件解决
+	//	Sleep(30);
+	//	ret = pClient->SendPacket(hWnd, CPacket(nCmd, pData, length), bAutoClose, wParam);
+	//}
+	return ret;
 }
 
 void CClientController::DownloadEnd()
@@ -123,26 +131,22 @@ void CClientController::StartWatchScreen()
 void CClientController::threadWatchScreen()
 {
 	Sleep(50);   //确保晚于dlg.DoModal();窗口启动
+	ULONGLONG nTick = GetTickCount64();
 	while (!mIsClosed) {
 		if (mWatchDlg.isFull() == false) {   //更新数据到缓存
-			std::list<CPacket> lstPacks;
-			int ret = SendCommandPacket(mWatchDlg.GetSafeHwnd(), true, NULL, 0);
-			//添加消息响应函数， 控制发送频率
-			if (ret == 6) {
-				if (CRemoteTool::Bytr2Image(mWatchDlg.GetImage(), lstPacks.front().strData) == 0) {
-					mWatchDlg.SetImageStatus(true);
-					TRACE("成功设置图片! 句柄: %08X\r\n", (HBITMAP)mWatchDlg.GetImage());
-					TRACE("和校验: %04X", lstPacks.front().sSum);
-				}
-				else {
-					TRACE("获取图片失败! ret = %d\r\n", ret);
-				}
+			if (GetTickCount64() - nTick < 200) {
+				Sleep(200 - DWORD(GetTickCount64() - nTick));
+			}
+			nTick = GetTickCount64();
+			int ret = SendCommandPacket(mWatchDlg.GetSafeHwnd(), 6, true, NULL, 0);
+			if (ret == 1) {
+				//TRACE("成功设置图片!\r\n");
 			}
 			else {
 				TRACE("获取图片失败! ret = %d\r\n", ret);
 			}
 		}
-		else Sleep(1);
+		Sleep(1);
 	}
 	TRACE("thread end %d\r\n", mIsClosed);
 }
@@ -151,51 +155,6 @@ void CClientController::threadWatchScreenEntry(void* arg)
 {
 	CClientController* thiz = (CClientController*)arg;
 	thiz->threadWatchScreen();
-	_endthread();
-}
-
-void CClientController::threadDownloadFile()
-{
-	//二进制写入模式打开（或创建）文件 
-	FILE* pFile = fopen(mstrLocal, "wb+");    
-	if (pFile == NULL) {
-		AfxMessageBox("文件无法创建!");
-		mStatusDlg.ShowWindow(SW_HIDE);
-		mRemoteDlg.EndWaitCursor();
-		return;
-	}
-	CClientSocket* pClient = CClientSocket::getInstance();
-	do {
-		int ret = SendCommandPacket(mRemoteDlg, 4, false,(BYTE*)(LPCTSTR)mstrRemote, mstrRemote.GetLength(), (WPARAM)pFile);
-		long long nLength = *(long long*)pClient->GetPacket().strData.c_str();
-		TRACE("client rev fileLength: %d\r\n", nLength);
-		if (nLength == 0) {
-			AfxMessageBox("无法读取文件!");
-			break;
-		}
-		long long nCnt = 0;
-		while (nCnt < nLength) {
-			ret = pClient->DealCommand();
-			if (ret < 0) {
-				AfxMessageBox("传输失败!");
-				TRACE("传输失败 ret = %d\r\n", ret);
-				break;
-			}
-			fwrite(pClient->GetPacket().strData.c_str(), 1, pClient->GetPacket().strData.size(), pFile);
-			nCnt += pClient->GetPacket().strData.size();
-		}
-	} while (false);
-	fclose(pFile);
-	pClient->CloseSocket();
-	mStatusDlg.ShowWindow(SW_HIDE);
-	mRemoteDlg.EndWaitCursor();
-	mRemoteDlg.MessageBox(_T("下载完成!"), _T("完成"));
-}
-
-void CClientController::threadDownloadEntry(void* arg)
-{
-	CClientController* thiz = (CClientController*)arg;
-	thiz->threadDownloadFile();
 	_endthread();
 }
 

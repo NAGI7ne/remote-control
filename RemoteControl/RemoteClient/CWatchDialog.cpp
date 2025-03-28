@@ -111,28 +111,29 @@ LRESULT CWatchDialog::OnSendPackAck(WPARAM wParam, LPARAM lParam)
 	else {
 		CPacket* pPacket = (CPacket*)wParam;
 		if (pPacket != NULL) {
-			switch (pPacket->sCmd) {
+			CPacket head = *(CPacket*)wParam;
+			delete (CPacket*)wParam;
+			switch (head.sCmd) {
 			case 6:
 			{
-				if (mImageIsFull == true) {
-					CRemoteTool::Bytr2Image(mImage, pPacket->strData);
-					CRect rect;
-					mPicture.GetWindowRect(rect);
-					m_nObjWidth = mImage.GetWidth();
-					m_nObjHeight = mImage.GetHeight();
-					//将图像缩放
-					mImage.StretchBlt(mPicture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(), SRCCOPY);
-					mPicture.InvalidateRect(NULL);  //将整个 mPicture 区域标记为“无效”，通知 Windows 系统需要重绘该控件
-					//系统会在空闲时触发 WM_PAINT 消息，调用控件的重绘函数
-					// 使刚刚绘制好的图像显示出来
-					TRACE("更新图片完成%d %d %08X\r\n", m_nObjWidth, m_nObjHeight, (HBITMAP)mImage);
-					mImage.Destroy();  //释放图像所占用的资源
-					//image.SetImageStatus();
-					mImageIsFull = false;
-				}
+				CRemoteTool::Bytr2Image(mImage, head.strData);
+				CRect rect;
+				mPicture.GetWindowRect(rect);
+				m_nObjWidth = mImage.GetWidth();
+				m_nObjHeight = mImage.GetHeight();
+				//将图像缩放
+				mImage.StretchBlt(mPicture.GetDC()->GetSafeHdc(), 0, 0, rect.Width(), rect.Height(), SRCCOPY);
+				mPicture.InvalidateRect(NULL);  //将整个 mPicture 区域标记为“无效”，通知 Windows 系统需要重绘该控件
+				//系统会在空闲时触发 WM_PAINT 消息，调用控件的重绘函数
+				// 使刚刚绘制好的图像显示出来
+				TRACE("更新图片完成%d %d %08X\r\n", m_nObjWidth, m_nObjHeight, (HBITMAP)mImage);
+				mImage.Destroy();  //释放图像所占用的资源
+				//image.SetImageStatus();
 				break;
 			}
 			case 5:
+				TRACE("远程端应答鼠标\r\n");
+				break;
 			case 7:
 			case 8:
 			default:
@@ -150,7 +151,7 @@ void CWatchDialog::OnLButtonDblClk(UINT nFlags, CPoint point)
 		MOUSEEV event;
 		event.ptXY = remote;
 		event.nButton = 0;  //左键
-		event.nAction = 1;  //双击
+		event.nAction = 2;  //双击
 		CClientController::getInstance()->SendCommandPacket(GetSafeHwnd(), 5, true, (BYTE*)&event, sizeof(event));
 	}
 	CDialog::OnLButtonDblClk(nFlags, point);
