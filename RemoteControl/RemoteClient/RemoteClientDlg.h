@@ -5,8 +5,11 @@
 #pragma once
 #include "ClientSocket.h"
 #include "StatusDlg.h"
+#ifndef WM_SEND_PACK_ACK
+#define WM_SEND_PACK_ACK (WM_USER + 2) //发送包数据应答
+#endif // !WM_SEND_PACK_ACK
 
-#define WM_SEND_PACKET (WM_USER+1) //(发送数据包消息①)
+//#define WM_SEND_PACKET (WM_USER+1) //(发送数据包消息①)
 								   //通过发送和接收消息进行内部通信
 								   // 从 WM_USER 开始，Windows 预留了一段消息编号（通常定义为 0x0400）
 								   // 给开发者用来定义自己的自定义消息，避免和系统的标准消息冲突
@@ -25,36 +28,30 @@ public:
 
 protected:
 	virtual void DoDataExchange(CDataExchange* pDX);	// DDX/DDV 支持
-
-private:
-	// 1:查看磁盘分区    2:查看指定目录文件
-	// 3:打开文件        4:下载文件  
-	// 5:鼠标操作        6:发送屏幕内容
-	// 7:锁机            8:解锁
-	// 9:删除文件        39:测试连接
-	// 返回值：命令， -1错误
-	int SendCommandPacket(int nCmd, bool bAutoClose = true, BYTE* pData = NULL, size_t length = 0);
-	CString GetPath(HTREEITEM hTree);
-	void DeleteTreeChildrenItem(HTREEITEM hTree);
+public:
 	void LoadFileInfo();
 	void LaodFileCurrent();
-	static void threadEntryForDownFile(void* arg);   //TODO:这里为什么是static
+private:
+	void DealCommand(WORD nCmd, const std::string& strData, LPARAM lParam);
+	void InitUIData();
+	void Str2Tree(const std::string& drivers, CTreeCtrl& tree);
+	void UpdateFileInfo(const FILEINFO& finfo, HTREEITEM hParent);
+	void UpdateDownloadFile(const std::string& strData, FILE* pFile);
+	CString GetPath(HTREEITEM hTree);
+	void DeleteTreeChildrenItem(HTREEITEM hTree);
+	//void LaodFileCurrent();
+	//static void threadEntryForDownFile(void* arg);   //TODO:这里为什么是static
 											   //线程入口函数必须是一个普通函数
 											   //非静态成员函数，它会默认带有一个隐藏的 this 指针
 											   //使成员函数无法直接作为线程入口函数使用，因为不符合预期的函数原型
 											   //还可以限定该函数的作用域,避免不必要的外部访问
-	void threadDownFile();
-	static void threadEntryForWatchData(void* arg);  //静态函数不能用this指针
-	void threadWatchFile();
+	//void threadDownFile();
+	//static void threadEntryForWatchData(void* arg);  //静态函数不能用this指针
+	//void threadWatchData();
 
 private:
-	CImage mImage;  //作图像缓存
-	bool mImageIsFull;  //缓存是否有数据
 	bool mIsThreadClosed;  //监视线程是否关闭
 public:
-	bool isFull() const { return mImageIsFull; }
-	CImage& GetImage() { return mImage; }
-	void SetImageStatus(bool isFull = false) { mImageIsFull = isFull; }
 
 // 实现
 protected:
@@ -81,6 +78,9 @@ public:
 	afx_msg void OnDownloadFile();
 	afx_msg void OnDeleteFile();
 	afx_msg void OnRunFile();
-	afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);  //定义自定义消息响应函数②
+	//afx_msg LRESULT OnSendPacket(WPARAM wParam, LPARAM lParam);  //定义自定义消息响应函数②
 	afx_msg void OnBnClickedBtnStartWatch();
+	afx_msg void OnIpnFieldchangedIpaddress2Serv(NMHDR* pNMHDR, LRESULT* pResult);
+	afx_msg void OnEnChangeEdit1Port();
+	afx_msg LRESULT OnSendPackAck(WPARAM wParam, LPARAM lParam);
 };
