@@ -100,7 +100,11 @@ int CClientController::DownFile(CString strPath)
 			AfxMessageBox("文件无法创建!");
 			return -1;
 		}
-		SendCommandPacket(mRemoteDlg, 4, false, (BYTE*)(LPCTSTR)mstrRemote, mstrRemote.GetLength(), (WPARAM)pFile);
+		SendCommandPacket(mRemoteDlg, 4, false, 
+			(BYTE*)(LPCTSTR)mstrRemote, 
+			mstrRemote.GetLength(), 
+			(WPARAM)pFile
+		);
 		/*mhThreadDownload = (HANDLE)_beginthread(&CClientController::threadDownloadEntry, 0, this);
 		if (WaitForSingleObject(mhThreadDownload, 0) != WAIT_TIMEOUT) {
 			return -1;
@@ -174,7 +178,7 @@ void CClientController::threadFunc()
 			else {
 				pmsg->result = -1;
 			}
-			SetEvent(hEvent);   //TODO:
+			SetEvent(hEvent);   
 		}
 		else {
 			std::map<UINT, MSGFUNC>::iterator it = mMapFunc.find(msg.message);

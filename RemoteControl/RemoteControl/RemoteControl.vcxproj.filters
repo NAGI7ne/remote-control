@@ -45,7 +45,13 @@
     <ClInclude Include="Packet.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="CRemoteQueue.h">
+    <ClInclude Include="CEdoyunQueue.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="EdoyunThread.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="EdoyunServer.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>
@@ -66,6 +72,9 @@
       <Filter>源文件</Filter>
     </ClCompile>
     <ClCompile Include="Command.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="EdoyunServer.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
   </ItemGroup>
