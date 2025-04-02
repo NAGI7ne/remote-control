@@ -1,12 +1,15 @@
 #pragma once
+
 #include "pch.h"
 #include "framework.h"
+#include <string>
+#include <vector>
 
 #pragma pack(push) 
 #pragma pack(1)
 class CPacket {
 public:
-	CPacket() : sHead(0), nLength(0), sCmd(0), sSum(0){}
+	CPacket() : sHead(0), nLength(0), sCmd(0), sSum(0) {}
 	CPacket(const CPacket& pack) {
 		sHead = pack.sHead;
 		nLength = pack.nLength;
@@ -45,7 +48,7 @@ public:
 			return;
 		}
 		nLength = *(DWORD*)(pData + i); i += 4; //DWORD为4个字节，强转后取+i映射后的4个字节，
-												//取值完成后再跳过长度段
+		//取值完成后再跳过长度段
 		if (nLength + i > nSize) // +i 总的是完整包的长度
 		{							//检查包是否完全收到
 			nSize = 0;
@@ -79,20 +82,20 @@ public:
 		}
 		return *this;
 	}
-	size_t Size() {
+	size_t Size()  {
 		return nLength + 6;
 	}
-	const char* Data(){    //返回完整数据
+	const char* Data() {    //返回完整数据
 		strOut.resize(nLength + 6);
 		BYTE* pData = (BYTE*)strOut.c_str();
 		*(WORD*)pData = sHead; pData += 2;
 		*(DWORD*)pData = nLength; pData += 4;
 		*(WORD*)pData = sCmd; pData += 2;
 		memcpy(pData, strData.c_str(), strData.size()); pData += strData.size();
-		*(WORD*)pData = sSum; 
+		*(WORD*)pData = sSum;
 		return strOut.c_str();
 	}
-	~CPacket(){}
+	~CPacket() {}
 public:
 	WORD sHead; //包头 0xFEFF
 	DWORD nLength; //包长度 （控制命令到和校验）
@@ -117,7 +120,7 @@ typedef struct fileInfo {
 }FILEINFO, * PFILEINFO;
 
 typedef struct MouseEvent {
-	MouseEvent(){
+	MouseEvent() {
 		nAction = 0;
 		nButton = -1;
 		ptXY.x = 0;
@@ -126,80 +129,78 @@ typedef struct MouseEvent {
 	WORD nAction;  //点击， 移动， 双击
 	WORD nButton;  //左键， 右键， 中键
 	POINT ptXY;   //坐标
-}MOUSEEV, *PMOUSEEV;
+}MOUSEEV, * PMOUSEEV;
 
+std::string GetErrorInfo(int wsaErrCode);
+void Dump(BYTE* pData, size_t nSize);
 //采用单例设计模式
-class CServerSocket    
+class CClientSocket
 {
 public:
 	//确保外部能够访问
 	//静态函数没有this指针，无法直接访问成员变量
-	static CServerSocket* getInstance() { 
-		if(!mInstance) mInstance = new CServerSocket;
+	static CClientSocket* getInstance() {
+		if (!mInstance) mInstance = new CClientSocket();
 		return mInstance;
 	}
-	bool InitSocket() {
-		//mSock = socket(PF_INET, SOCK_STREAM, 0);
+	bool InitSocket(int nIP, int nPort) {
+		if (mSock != INVALID_SOCKET) CloseSocket();
+		mSock = socket(PF_INET, SOCK_STREAM, 0);
 		if (mSock == -1) return false;
 		sockaddr_in servAddr;
 		memset(&servAddr, 0, sizeof(servAddr));
-		// 服务器可能不止一个ip地址,所监听所有，确保客户端能连上
-		servAddr.sin_addr.s_addr = INADDR_ANY; 
 		servAddr.sin_family = AF_INET;
-		servAddr.sin_port = htons(9339);
-		if (bind(mSock, (sockaddr*)&servAddr, sizeof(servAddr)) == -1) return false;
-		if (listen(mSock, 1) == -1) return false;
-		return true;
-	}
-	bool AcceptClient() {
-		TRACE("enter AcceptClient\r\n");
-		sockaddr_in clntAddr;
-		int clntAddrSize = sizeof(clntAddr);
-		mClntSock = accept(mSock, (sockaddr*)&clntAddr, &clntAddrSize);
-		TRACE("mClnt = %d\r\n", mClntSock);
-		if (mClntSock == -1) return false;
-		return true;
-	}
-#define BUFFER_SIZE 4096
-	int DealCommand() {
-		if (mClntSock == -1) return -1;
-		char* buffer = new char[BUFFER_SIZE];
-		if (buffer == NULL) {
-			TRACE("内存不足! \r\n");
-			return - 2;
+		TRACE("addr: %08x nIP: %08x\r\n", inet_addr("127.0.0.1"), nIP);
+		servAddr.sin_port = htons(nPort);
+		servAddr.sin_addr.s_addr = htonl(nIP);
+		if (servAddr.sin_addr.s_addr == INADDR_NONE) {
+			AfxMessageBox(_T("指定IP不存在!"));
+			return false;
 		}
-		memset(buffer, 0, BUFFER_SIZE);
-		size_t index = 0;
+		int ret = connect(mSock, (sockaddr*)&servAddr, sizeof(servAddr));
+		if (ret == -1) {
+			AfxMessageBox(_T("连接失败!"));
+			TRACE("连接失败: %d %s\r\n", WSAGetLastError(), GetErrorInfo(WSAGetLastError()).c_str());
+			return false;
+		}
+		return true;
+	}
+#define BUFFER_SIZE 2048000
+	int DealCommand() {
+		if (mSock == -1) return false;
+		char* buffer = mBuffer.data();
+		//memset(buffer, 0, BUFFER_SIZE);
+
+		// index记录当前缓冲区中累计的有效数据长度
+		//确保未处理的数据保留在缓冲区的前部，为后续数据接收做好准备
+		static size_t index = 0;    
 		while (1) {
-			size_t len = recv(mClntSock, buffer + index, BUFFER_SIZE - index, 0);
-			if (len <= 0) { delete[] buffer; return -1; }
-			TRACE("server rev : %d\r\n", len);
+			size_t len = recv(mSock, buffer + index, BUFFER_SIZE - index, 0);
+			if (len <= 0 && (index <= 0)) return -1;  //如果没接收到数据并且缓冲区没有数据
+			TRACE("client rev : %d\r\n", len);
 			index += len;
 			len = index;
 			mPacket = CPacket((BYTE*)buffer, len);
-			TRACE("服务器解包成功 cmd: %d\r\n", mPacket.sCmd);
+			//TRACE("客户端解包成功 cmd: %d\r\n", mPacket.sCmd);
 			if (len > 0) {
-				memcpy(buffer, buffer + len, BUFFER_SIZE - len);
+				memcpy(buffer, buffer + len, index - len);  //这里是index-len，易错
 				index -= len;
-				delete[] buffer;
 				return mPacket.sCmd;
 			}
 		}
-		delete[] buffer;
 		return -1;
 	}
 	bool Send(const char* pData, int nSize) {
-		if (mClntSock == -1) return false;
-		return send(mClntSock, pData, nSize, 0) > 0;
+		if (mSock == -1) return false;
+		return send(mSock, pData, nSize, 0) > 0;
 	}
 	bool Send(CPacket& pack) {
-		if (mClntSock == -1) return false;
-		return send(mClntSock, pack.Data(), pack.Size(), 0) > 0;
+		TRACE("mSock = %d\r\n", mSock);
+		if (mSock == -1) return false;
+		return send(mSock, pack.Data(), pack.Size(), 0) > 0;
 	}
-	bool GetFilePath(std::string &strPath)const {
-		if (((mPacket.sCmd >= 2) && (mPacket.sCmd <= 4)) || 
-			(mPacket.sCmd == 9)) 
-		{
+	bool GetFilePath(std::string& strPath)const {
+		if (mPacket.sCmd >= 2 && mPacket.sCmd <= 4) {
 			strPath = mPacket.strData;
 			return true;
 		}
@@ -215,28 +216,28 @@ public:
 	CPacket& GetPacket() {
 		return mPacket;
 	}
-	void CloseClient() {
-		closesocket(mClntSock);
-		mClntSock = INVALID_SOCKET;
+	void CloseSocket() {
+		closesocket(mSock);
+		mSock = INVALID_SOCKET;
 	}
 private:
-	SOCKET mSock, mClntSock;
+	std::vector<char> mBuffer;
+	SOCKET mSock;
 	CPacket mPacket;
 	// 禁用拷贝构造
-	CServerSocket& operator=(const CServerSocket &ss){}
-	CServerSocket(const CServerSocket& ss) {
+	CClientSocket& operator=(const CClientSocket& ss) {}
+	CClientSocket(const CClientSocket& ss) {
 		mSock = ss.mSock;
-		mClntSock = ss.mClntSock;
 	}
-	CServerSocket() {
-		mClntSock = INVALID_SOCKET; //-1
+	CClientSocket() {
 		if (!InitSockEnv()) {
 			MessageBox(NULL, _T("无法初始化套接字环境，请检查网络设置"), _T("初始化错误!"), MB_OK | MB_ICONERROR);
 			exit(0);
 		}
-		mSock = socket(PF_INET, SOCK_STREAM, 0);
+		mBuffer.resize(BUFFER_SIZE);
+		memset(mBuffer.data(), 0, BUFFER_SIZE);
 	}
-	~CServerSocket() {
+	~CClientSocket() {
 		closesocket(mSock);
 		WSACleanup();
 	}
@@ -248,25 +249,25 @@ private:
 		return TRUE;
 	}
 	//这里mInstance是静态变量，release需要操作这个变量所以是静态的函数
-	static void releaseInstance() { 
-		if (mInstance) {
-			CServerSocket* tmp = mInstance;
+	static void releaseInstance() {
+		if (mInstance != NULL) {
+			CClientSocket* tmp = mInstance;
 			mInstance = NULL;
-			//delete时调用CServerSocket的析构函数
+			//delete时调用CClientSocket的析构函数
 			delete tmp;
 		}
 	}
 	//在main开始前初始化实例
-	static CServerSocket* mInstance;
+	static CClientSocket* mInstance;
 	//防止类没有被析构，原因mInstance没有delete，加一个类来间接删除mInstance
 	//CHelper 的析构函数充当了一个监控者，它在对象销毁时主动清理单例
 	class CHelper {
 	public:
 		CHelper() {
-			CServerSocket::getInstance();
+			CClientSocket::getInstance();
 		}
 		~CHelper() {
-			CServerSocket::releaseInstance();
+			CClientSocket::releaseInstance();
 		}
 	};
 	//加static实现程序启动前自动构造、程序终止时自动析构
