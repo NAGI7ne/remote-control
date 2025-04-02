@@ -35,8 +35,8 @@ public:
 			strData.clear();
 		}
 		sSum = 0;
-		for (size_t j = 0; j < nSize; j++) {
-			sSum += pData[j] & 0xFF;
+		for (size_t j = 0; j < strData.size(); j++) {
+			sSum += BYTE(strData[j]) & 0xFF;
 		}
 	}
 	CPacket(const BYTE* pData, size_t& nSize)
@@ -78,7 +78,9 @@ public:
 		}
 		nSize = 0;
 	}
-	~CPacket() {}
+	~CPacket() {
+		TRACE("enter here\r\n");
+	}
 	CPacket& operator=(const CPacket& pack) {
 		if (this != &pack) {
 			sHead = pack.sHead;
@@ -210,7 +212,7 @@ public:
 	//bool SendPacket(const CPacket& pack, std::list<CPacket>& lstPacks, bool isAutoClosed = true);
 	bool SendPacket(HWND hWnd, const CPacket& pack, bool isAutoClosed = true, WPARAM wParam = 0);
 
-	bool GetFilePath(std::string& strPath)const {
+	bool GetFilePath(std::string& strPath) {
 		if (mPacket.sCmd >= 2 && mPacket.sCmd <= 4) {
 			strPath = mPacket.strData;
 			return true;

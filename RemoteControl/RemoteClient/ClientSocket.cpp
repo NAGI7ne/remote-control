@@ -264,7 +264,7 @@ void CClientSocket::SendPack(UINT nMsg, WPARAM wParam, LPARAM lParam)
 				if (length > 0 || index > 0) {
 					index += (size_t)length;
 					size_t nLen = index;
-					CPacket pack((BYTE*)pBuffer, nLen);
+					CPacket pack((BYTE*)pBuffer, nLen);  //发包完成后会返回发包用的nLen
 					if(nLen > 0){
 						TRACE("ack pack %d to hWnd %08X %d %d\r\n", pack.sCmd, hWnd, index, nLen);
 						TRACE("%04X\r\n", *(WORD*)pBuffer + nLen);
@@ -290,6 +290,6 @@ void CClientSocket::SendPack(UINT nMsg, WPARAM wParam, LPARAM lParam)
 		}
 	}
 	else {
-		::SendMessage(hWnd, WM_SEND_PACK_ACK, NULL, -2);
+		::SendMessage(hWnd, WM_SEND_PACK_ACK, NULL, -2); 
 	}
 }

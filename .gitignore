@@ -42,3 +42,9 @@
 /RemoteControl/RemoteControl/x64
 /RemoteControl/RemoteControl/RemoteControl.aps
 /RemoteControl/RemoteControl/test.png
+/RemoteControl/Debug
+/RemoteControl/RemoteClient/Debug
+/RemoteControl/RemoteControl/Debug
+*.pdb
+/RemoteControl/RemoteClient/Microsoft.DTfW.DHL.manifest
+/RemoteControl/RemoteControl/Microsoft.DTfW.DHL.manifest

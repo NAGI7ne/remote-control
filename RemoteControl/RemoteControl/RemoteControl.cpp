@@ -7,7 +7,11 @@
 #include "ServerSocket.h"
 #include "Command.h"
 #include <conio.h>
-
+#include "CEdoyunQueue.h"
+#include <MSWSock.h>
+#include "EdoyunServer.h"
+#define _CRTDBG_MAP_ALLOC
+#include <crtdbg.h>
 
 #ifdef _DEBUG
 #define new DEBUG_NEW
@@ -46,102 +50,14 @@ bool ChooseAutoInvoke(const CString& strPath) {
     }
     return true;
 }
-
-#define IOCP_LIST_EMPTY 0;
-#define IOCP_LIST_PUSH 1;
-#define IOCP_LIST_POP 2;
-
-enum {
-    IocpListEmpty,
-    IocpListPush,
-    IocpListPop
-};
-
-typedef struct IocpParam {
-    int nOperator;
-    std::string strData;
-    _beginthread_proc_type cbFunc;
-    IocpParam(int op, const char* Data, _beginthread_proc_type cb = NULL) {
-        nOperator = op;
-        strData = Data;
-        cbFunc = cb;
-    }
-    IocpParam() {
-        nOperator = -1;
-    }
-
-}IOCP_PARAM;
-
-void threadMain(HANDLE hIOCP) {
-    std::list<std::string> lstString;
-    DWORD dwTransferred = 0;
-    ULONG_PTR ComletionKey = 0;
-    OVERLAPPED* pOverlapped = NULL;
-    while (GetQueuedCompletionStatus(hIOCP, &dwTransferred, &ComletionKey, &pOverlapped, INFINITE)) {
-        if ((dwTransferred == 0) && (ComletionKey == NULL)) {
-            printf("thread is prepare to exit!\r\n");
-            break;
-        }
-        IOCP_PARAM* pParam = (IOCP_PARAM*)ComletionKey;
-        if (pParam->nOperator == IocpListPush) {
-            lstString.push_back(pParam->strData);
-        }
-        else if (pParam->nOperator == IocpListPop) {
-            std::string str;
-            if (lstString.size() > 0) {
-                str = lstString.front();
-                lstString.pop_front();
-            }
-            if (pParam->cbFunc) {
-                pParam->cbFunc(&str);
-            }
-        }
-        else if (pParam->nOperator == IocpListEmpty) {
-            lstString.clear();
-        }
-        delete pParam;
-    }
-}
-
-void threadQueueEntry(HANDLE hIOCP){
-    threadMain(hIOCP);
-    _endthread();
-}
-
-void func(void* arg) {
-    std::string* pstr = (std::string*)arg;
-    if (pstr != NULL) {
-        printf("pop from list: %s\r\n", pstr->c_str());
-        delete pstr;
-    }
-    else {
-        printf("list is empty!\r\n");
-    }
-}
-
+void iocp();
 int main()
 {
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
     if (!CRemoteTool::Init())return 1;
-    HANDLE hIOCP = INVALID_HANDLE_VALUE;
-    hIOCP = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 1);
-    HANDLE hThread = (HANDLE)_beginthread(threadQueueEntry, 0, hIOCP);
+  
+    iocp();
 
-    ULONGLONG tick = GetTickCount64();
-    while (_kbhit() != 0) {
-        if (GetTickCount64() - tick > 1300) {
-            PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPop, "hello word"), NULL);
-        }
-        if (GetTickCount64() - tick > 2000) {
-            PostQueuedCompletionStatus(hIOCP, sizeof(IOCP_PARAM), (ULONG_PTR)new IOCP_PARAM(IocpListPush, "hello word"), NULL);
-        }
-        Sleep(1);
-    }
-    if (hIOCP != NULL) {
-        PostQueuedCompletionStatus(hIOCP, 0, NULL, NULL);
-        WaitForSingleObject(hThread, INFINITE);
-    }
-    CloseHandle(hIOCP);
-    printf("exit done!\r\n");
     /*if (CRemoteTool::IsAdmin()) {
         if (!CRemoteTool::Init())return 1;
         if (ChooseAutoInvoke(INVOKE_PATH)) {
@@ -163,5 +79,25 @@ int main()
             return 1;
         }
     }*/
+
     return 0;
+}
+
+class COverlapped {
+public:
+    OVERLAPPED m_overlapped;
+    DWORD m_operator;
+    char m_buffer[4096];
+    COverlapped() {
+        m_operator = 0;
+        memset(&m_overlapped, 0, sizeof(m_overlapped));
+        memset(m_buffer, 0, sizeof(m_buffer));
+    }
+};
+
+void iocp()
+{
+    EdoyunServer server;
+    server.StartService();
+    getchar();
 }

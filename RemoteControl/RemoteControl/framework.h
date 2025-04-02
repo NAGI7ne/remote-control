@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+//#include <vld.h>
 #include "targetver.h"
 #include <stdio.h>
 #include <tchar.h>

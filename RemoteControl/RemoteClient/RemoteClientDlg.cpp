@@ -107,8 +107,8 @@ void CRemoteClientDlg::InitUIData()
 	SetIcon(m_hIcon, FALSE);		// 设置小图标
 
 	UpdateData();  //从对话框上的控件（例如编辑框、复选框等）中提取当前的内容，并把这些数据写入关联的成员变量中。
-	mServAddr = 0xC0A8A084;  //192.168.160.132
-	//mServAddr = 0x7F000001;  //127.0.0.1
+	//mServAddr = 0xC0A8A084;  //192.168.160.132
+	mServAddr = 0x7F000001;  //127.0.0.1
 	mNport = _T("9339");
 	CClientController* pController = CClientController::getInstance();
 	pController->UpdataAddress(mServAddr, atoi((LPCTSTR)mNport));
